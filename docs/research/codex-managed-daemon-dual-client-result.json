@@ -1,0 +1,171 @@
+{
+  "observedAt": "2026-09-30T10:06:00.019329+00:00",
+  "threadId": "01a0f1c3-8aa2-7b02-8459-70430367dc4d",
+  "cwd": "/tmp/cc-daemon-approval-e2e",
+  "turnId": "01a0f1c4-b748-72f0-86fc-368161bfdac4",
+  "cliKeptOpen": true,
+  "pendingApprovalReplayedOnAttach": {
+    "requestId": 32,
+    "method": "item/commandExecution/requestApproval",
+    "command": "/bin/bash -lc \"python3 -u -c 'import time; [(print(\\\"DUAL-E2E-TICK\\\", i, flush=True), time.sleep(5)) for i in range(36)]'\""
+  },
+  "probeReply": {
+    "decision": "accept",
+    "probe": "approvalReplySent",
+    "requestId": 32,
+    "threadId": "01a0f1c3-8aa2-7b02-8459-70430367dc4d"
+  },
+  "resolvedNotification": {
+    "method": "serverRequest/resolved",
+    "params": {
+      "threadId": "01a0f1c3-8aa2-7b02-8459-70430367dc4d",
+      "requestId": 32
+    }
+  },
+  "cliUserConfirmation": "审批提示已消失，任务继续执行",
+  "liveOutputDeltas": [
+    "DUAL-E2E-TICK 1\n",
+    "DUAL-E2E-TICK 2\n",
+    "DUAL-E2E-TICK 3\n",
+    "DUAL-E2E-TICK 4\n",
+    "DUAL-E2E-TICK 5\n",
+    "DUAL-E2E-TICK 6\n",
+    "DUAL-E2E-TICK 7\n",
+    "DUAL-E2E-TICK 8\n",
+    "DUAL-E2E-TICK 9\n",
+    "DUAL-E2E-TICK 10\n",
+    "DUAL-E2E-TICK 11\n",
+    "DUAL-E2E-TICK 12\n",
+    "DUAL-E2E-TICK 13\n",
+    "DUAL-E2E-TICK 14\n",
+    "DUAL-E2E-TICK 15\n",
+    "DUAL-E2E-TICK 16\n",
+    "DUAL-E2E-TICK 17\n",
+    "DUAL-E2E-TICK 18\n",
+    "DUAL-E2E-TICK 19\n",
+    "DUAL-E2E-TICK 20\n",
+    "DUAL-E2E-TICK 21\n",
+    "DUAL-E2E-TICK 22\n",
+    "DUAL-E2E-TICK 23\n",
+    "DUAL-E2E-TICK 24\n",
+    "DUAL-E2E-TICK 25\n",
+    "DUAL-E2E-TICK 26\n",
+    "DUAL-E2E-TICK 27\n",
+    "DUAL-E2E-TICK 28\n",
+    "DUAL-E2E-TICK 29\n",
+    "DUAL-E2E-TICK 30\n",
+    "DUAL-E2E-TICK 31\n",
+    "DUAL-E2E-TICK 32\n",
+    "DUAL-E2E-TICK 33\n",
+    "DUAL-E2E-TICK 34\n",
+    "DUAL-E2E-TICK 35\n"
+  ],
+  "status": "approval synchronization passed; probe live output passed; CLI continuous display has a gap after TICK 11",
+  "cliUserOutputConfirmation": "能看到 TICK 标记",
+  "firstTurnCompletion": {
+    "method": "turn/completed",
+    "params": {
+      "threadId": "01a0f1c3-8aa2-7b02-8459-70430367dc4d",
+      "turn": {
+        "id": "01a0f1c4-b748-72f0-86fc-368161bfdac4",
+        "items": [
+          {
+            "type": "agentMessage",
+            "id": "msg_0cbdea4e09db3e37016abcdf896c4887d0abcaf15a37a3567b",
+            "text": "DUAL-E2E-DONE",
+            "phase": "final_answer",
+            "memoryCitation": null,
+            "delivery": null,
+            "questions": null
+          }
+        ],
+        "itemsView": "summary",
+        "status": "completed",
+        "error": null,
+        "startedAt": 1790762596,
+        "completedAt": 1790762889,
+        "durationMs": 293814
+      }
+    }
+  },
+  "firstTurnFinalMessage": "DUAL-E2E-DONE",
+  "secondApproval": {
+    "requestId": 38,
+    "turnId": "01a0f1ca-04a8-7791-b26d-0da2cb6b4828",
+    "cliUserConfirmation": "已允许，任务继续执行",
+    "resolvedNotification": {
+      "method": "serverRequest/resolved",
+      "params": {
+        "threadId": "01a0f1c3-8aa2-7b02-8459-70430367dc4d",
+        "requestId": 38
+      }
+    },
+    "pendingAfterResolution": {
+      "probe": "pendingApprovals",
+      "requests": [],
+      "threadId": "01a0f1c3-8aa2-7b02-8459-70430367dc4d"
+    },
+    "staleReplyRejectedLocally": {
+      "probe": "controlRejected",
+      "reason": "request is no longer pending or belongs to another thread"
+    },
+    "commandResult": {
+      "type": "commandExecution",
+      "id": "exec-95c6f428-b605-4517-90ea-b00e39e0f239",
+      "pluginId": null,
+      "scriptPath": null,
+      "command": "/bin/bash -lc \"python3 -u -c 'print(\\\"DUAL-E2E-CLI-APPROVED\\\", flush=True)'\"",
+      "cwd": "/tmp/cc-daemon-approval-e2e",
+      "processId": "53866",
+      "source": "unifiedExecStartup",
+      "status": "completed",
+      "commandActions": [
+        {
+          "type": "unknown",
+          "command": "python3 -u -c 'print(\"DUAL-E2E-CLI-APPROVED\", flush=True)'"
+        }
+      ],
+      "aggregatedOutput": "DUAL-E2E-CLI-APPROVED\n",
+      "exitCode": 0,
+      "durationMs": 0
+    },
+    "turnCompletion": {
+      "method": "turn/completed",
+      "params": {
+        "threadId": "01a0f1c3-8aa2-7b02-8459-70430367dc4d",
+        "turn": {
+          "id": "01a0f1ca-04a8-7791-b26d-0da2cb6b4828",
+          "items": [
+            {
+              "type": "agentMessage",
+              "id": "msg_0cbdea4e09db3e37016abcdfe6f08c87d086130e9ae499ec8e",
+              "text": "DUAL-E2E-SECOND-DONE",
+              "phase": "final_answer",
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            }
+          ],
+          "itemsView": "summary",
+          "status": "completed",
+          "error": null,
+          "startedAt": 1790762943,
+          "completedAt": 1790762983,
+          "durationMs": 39902
+        }
+      }
+    }
+  },
+  "cliDisplayFollowup": {
+    "userReported": "CLI Running block and show details stopped at TICK 11; progress messages referenced 22 and 33; a separate Ran block later displayed 33..35.",
+    "probeObservations": {
+      "commandItemId": "exec-52a80605-f9a7-446c-8ba0-c747f191a2b3",
+      "liveTickRange": "1..35",
+      "singleCompletedCommandItem": true,
+      "completedOutputRange": "0..35",
+      "probeDidNotStartOrSteerTask": true
+    },
+    "sourceBasedInference": "CLI 0.158.0 prepares assistant messages by flushing its active cell; command deltas only append to the current active ExecCell; command completion can render a new cell from aggregatedOutput. This explains the frozen Running block and later Ran block, but no CLI ingress trace was collected.",
+    "refreshStatus": "Redraw alone cannot restore a flushed command cell. Reattach or snapshot rebuild may help but is unverified and may not preserve continuous display after later commentary."
+  }
+}

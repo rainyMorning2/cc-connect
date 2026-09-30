@@ -1,0 +1,87 @@
+{
+  "date": "2026-09-30",
+  "cliVersion": "0.158.0",
+  "appServerVersion": "0.159.2",
+  "threadId": "01a0f1a3-916d-78a0-9541-b00864547127",
+  "actionsSent": [
+    "initialize",
+    "initialized",
+    "thread/resume"
+  ],
+  "controlActionsSent": [],
+  "observations": [
+    {
+      "connection": "watch-first.jsonl",
+      "threadId": "01a0f1a3-916d-78a0-9541-b00864547127",
+      "source": "vscode",
+      "statusAtAttach": {
+        "type": "active",
+        "activeFlags": []
+      },
+      "turnsAtAttach": [
+        {
+          "id": "01a0f1a3-c2f8-7eb1-9e96-0db64ee44c56",
+          "status": "inProgress"
+        }
+      ],
+      "liveOutput": [
+        "CLI-PROBE-E2E-TICK 6",
+        "CLI-PROBE-E2E-TICK 7",
+        "CLI-PROBE-E2E-TICK 8",
+        "CLI-PROBE-E2E-TICK 9"
+      ],
+      "finalMarkers": [],
+      "completion": []
+    },
+    {
+      "connection": "watch-reconnect.jsonl",
+      "threadId": "01a0f1a3-916d-78a0-9541-b00864547127",
+      "source": "vscode",
+      "statusAtAttach": {
+        "type": "active",
+        "activeFlags": []
+      },
+      "turnsAtAttach": [
+        {
+          "id": "01a0f1a3-c2f8-7eb1-9e96-0db64ee44c56",
+          "status": "inProgress"
+        }
+      ],
+      "liveOutput": [
+        "CLI-PROBE-E2E-TICK 20",
+        "CLI-PROBE-E2E-TICK 21",
+        "CLI-PROBE-E2E-TICK 22",
+        "CLI-PROBE-E2E-TICK 23",
+        "CLI-PROBE-E2E-TICK 24",
+        "CLI-PROBE-E2E-TICK 25",
+        "CLI-PROBE-E2E-TICK 26",
+        "CLI-PROBE-E2E-TICK 27",
+        "CLI-PROBE-E2E-TICK 28",
+        "CLI-PROBE-E2E-TICK 29",
+        "CLI-PROBE-E2E-TICK 30",
+        "CLI-PROBE-E2E-TICK 31",
+        "CLI-PROBE-E2E-TICK 32",
+        "CLI-PROBE-E2E-TICK 33",
+        "CLI-PROBE-E2E-TICK 34",
+        "CLI-PROBE-E2E-TICK 35"
+      ],
+      "finalMarkers": [
+        "CLI-PROBE-E2E-DONE"
+      ],
+      "completion": [
+        {
+          "threadId": "01a0f1a3-916d-78a0-9541-b00864547127",
+          "turnId": "01a0f1a3-c2f8-7eb1-9e96-0db64ee44c56",
+          "status": "completed",
+          "durationMs": 192209
+        }
+      ]
+    }
+  ],
+  "userReportedLaunchRoute": [
+    "Windows Terminal",
+    "WSL",
+    "Codex CLI"
+  ],
+  "sourceInterpretation": "The daemon reports source=vscode. Codex 0.159.2 app-server startup passes SessionSource::VSCode to the runtime; this field does not establish the launching terminal or client UI."
+}
