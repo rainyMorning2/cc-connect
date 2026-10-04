@@ -6221,7 +6221,6 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 			// already displayed before disconnecting or tools are hidden.
 			if event.Metadata["result_authoritative"] == true && event.Content != "" {
 				textParts = []string{event.Content}
-				itemTextParts = map[string][]int{}
 				segmentStart = 0
 				partialText = event.Content
 				cardAnswerText.Reset()
@@ -9933,7 +9932,7 @@ func (e *Engine) cmdHistory(p Platform, msg *Message, args []string) {
 			icon = "🤖"
 		}
 		content := truncateHistoryEntry(h.Content, maxLen)
-		sb.WriteString(fmt.Sprintf("%s [%s]\n%s\n\n", icon, e.historyTimestamp(h.Timestamp), content))
+		fmt.Fprintf(&sb, "%s [%s]\n%s\n\n", icon, e.historyTimestamp(h.Timestamp), content)
 	}
 	e.reply(p, msg.ReplyCtx, sb.String())
 }
@@ -14228,7 +14227,7 @@ func (e *Engine) renderHistoryCard(sessionKey string) *Card {
 			icon = "🤖"
 		}
 		content := truncateHistoryEntry(h.Content, maxLen)
-		sb.WriteString(fmt.Sprintf("%s [%s]\n%s\n\n", icon, e.historyTimestamp(h.Timestamp), content))
+		fmt.Fprintf(&sb, "%s [%s]\n%s\n\n", icon, e.historyTimestamp(h.Timestamp), content)
 	}
 
 	return NewCard().
