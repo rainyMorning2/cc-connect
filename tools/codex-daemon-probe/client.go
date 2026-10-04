@@ -49,8 +49,9 @@ type message struct {
 	} `json:"error,omitempty"`
 }
 
-// client is intentionally single-reader/single-writer, used sequentially by
-// the probe. Messages received before an RPC response are retained in order.
+// client has one reader and one writer. request is only used before entering
+// an interactive event reader; interactive RPCs match responses in that loop.
+// Messages received before a synchronous RPC response are retained in order.
 type client struct {
 	conn   *websocket.Conn
 	nextID int

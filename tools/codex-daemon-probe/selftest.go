@@ -14,8 +14,10 @@ import (
 
 type threadSnapshot struct {
 	Thread struct {
-		ID    string `json:"id"`
-		Turns []struct {
+		ID                   string          `json:"id"`
+		Source               json.RawMessage `json:"source"`
+		CanAcceptDirectInput *bool           `json:"canAcceptDirectInput"`
+		Turns                []struct {
 			ID     string `json:"id"`
 			Status string `json:"status"`
 		} `json:"turns"`
@@ -58,12 +60,13 @@ func waitFor(ctx context.Context, c *client, method string, thread string) (mess
 
 // A local fake Responses provider makes the real daemon exercise its runtime
 // without inference charges or external requests. The command approval is
-// declined; no shell command is executed. All control RPCs use ONLY the ID
+// declined or cancelled; no shell command is executed. All control RPCs use ONLY the ID
 // returned by this function's thread/start, never an existing thread ID.
 func selfTestDaemon(ctx context.Context, info daemonInfo, out *json.Encoder) error {
 	ctx, cancel := context.WithCancel(ctx)
 	var calls atomic.Int32
 	var sawSteer atomic.Bool
+	var sawRejectedSteer atomic.Bool
 	hold := make(chan struct{}, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(io.LimitReader(r.Body, 8*1024*1024))
@@ -73,6 +76,9 @@ func selfTestDaemon(ctx context.Context, info daemonInfo, out *json.Encoder) err
 		}
 		if strings.Contains(string(body), "cc-connect-steer-marker") {
 			sawSteer.Store(true)
+		}
+		if strings.Contains(string(body), "cc-connect-rejected-steer-marker") {
+			sawRejectedSteer.Store(true)
 		}
 		if r.Method != "POST" || !strings.HasSuffix(r.URL.Path, "/responses") {
 			http.NotFound(w, r)
@@ -86,7 +92,7 @@ func selfTestDaemon(ctx context.Context, info daemonInfo, out *json.Encoder) err
 			w.(http.Flusher).Flush()
 		}
 		emit(map[string]any{"type": "response.created", "response": map[string]any{"id": fmt.Sprintf("probe-%d", n)}})
-		if n >= 3 {
+		if n >= 4 {
 			select {
 			case hold <- struct{}{}:
 			default:
@@ -98,7 +104,7 @@ func selfTestDaemon(ctx context.Context, info daemonInfo, out *json.Encoder) err
 			return
 		}
 		item := map[string]any{"type": "message", "role": "assistant", "id": "probe-message", "content": []any{map[string]any{"type": "output_text", "text": "cc-connect-probe-complete"}}}
-		if n == 1 {
+		if n == 1 || n == 3 {
 			args, _ := json.Marshal(map[string]any{"cmd": "python3 -c 'print(42)'", "sandbox_permissions": "require_escalated", "justification": "CC Connect isolated probe; decline this request."})
 			item = map[string]any{"type": "function_call", "call_id": "probe-approval", "name": "exec_command", "arguments": string(args)}
 		}
@@ -178,14 +184,11 @@ func selfTestDaemon(ctx context.Context, info daemonInfo, out *json.Encoder) err
 	if err := report("second client resume: same active turn and pending approval"); err != nil {
 		return err
 	}
-	var steered struct {
-		TurnID string `json:"turnId"`
-	}
-	if err := b.request(ctx, "turn/steer", map[string]any{"threadId": tid, "expectedTurnId": turn.Turn.ID, "input": input("cc-connect-steer-marker")}, &steered); err != nil {
+	if err := selfTestRejectedSteer(ctx, b, tid, "not-the-active-turn", "active turn mismatch", out); err != nil {
 		return err
 	}
-	if steered.TurnID != turn.Turn.ID {
-		return fmt.Errorf("steer returned a different turn")
+	if err := selfTestInteractiveSteer(ctx, b, tid, resumed, out); err != nil {
+		return err
 	}
 	if err := report("cross-client steer accepted for original active turn"); err != nil {
 		return err
@@ -243,8 +246,20 @@ func selfTestDaemon(ctx context.Context, info daemonInfo, out *json.Encoder) err
 	if !sawSteer.Load() {
 		return fmt.Errorf("steer acknowledged but missing from subsequent model input")
 	}
+	if sawRejectedSteer.Load() {
+		return fmt.Errorf("rejected steer reached model input")
+	}
 	if err := report("live output and completion; steer marker reached model input"); err != nil {
 		return err
+	}
+	if err := selfTestRejectedSteer(ctx, c, tid, turn.Turn.ID, "turn already completed", out); err != nil {
+		return err
+	}
+	if err := selfTestCancelApproval(ctx, a, c, tid, out); err != nil {
+		return err
+	}
+	if calls.Load() != 3 {
+		return fmt.Errorf("cancel unexpectedly continued inference: model calls=%d", calls.Load())
 	}
 	if err := a.request(ctx, "turn/start", map[string]any{"threadId": tid, "input": input("hold for isolated interrupt test")}, &turn); err != nil {
 		return err
@@ -265,4 +280,59 @@ func selfTestDaemon(ctx context.Context, info daemonInfo, out *json.Encoder) err
 		return fmt.Errorf("interrupt did not finish with interrupted status: %s", completed.Params)
 	}
 	return report("cross-client interrupt on separate test turn")
+}
+
+// Exercise the same decision validation and response writer as interactive
+// mode, using only the isolated self-test thread created by the caller.
+func selfTestCancelApproval(ctx context.Context, primary, observer *client, thread string, out *json.Encoder) error {
+	var started struct {
+		Turn struct {
+			ID string `json:"id"`
+		} `json:"turn"`
+	}
+	if err := primary.request(ctx, "turn/start", map[string]any{"threadId": thread, "input": input("isolated approval cancel test")}, &started); err != nil {
+		return err
+	}
+	approval, err := waitFor(ctx, observer, "item/commandExecution/requestApproval", thread)
+	if err != nil {
+		return err
+	}
+	tracker := &approvalTracker{thread: thread, pending: map[string]pendingApproval{}}
+	if err := tracker.observe(approval); err != nil {
+		return err
+	}
+	if err := tracker.reply(interactiveControl{RequestID: approval.ID, Decision: "cancel"}, func(v any) error { return observer.write(ctx, v) }); err != nil {
+		return fmt.Errorf("cancel offered approval: %w", err)
+	}
+	resolved, err := waitFor(ctx, primary, "serverRequest/resolved", thread)
+	if err != nil {
+		return err
+	}
+	var resolution struct {
+		RequestID json.RawMessage `json:"requestId"`
+	}
+	if err := json.Unmarshal(resolved.Params, &resolution); err != nil {
+		return err
+	}
+	if string(resolution.RequestID) != string(approval.ID) {
+		return fmt.Errorf("cancel resolved a different approval")
+	}
+	completed, err := waitFor(ctx, observer, "turn/completed", thread)
+	if err != nil {
+		return err
+	}
+	var completion struct {
+		Turn struct {
+			ID     string `json:"id"`
+			Status string `json:"status"`
+		} `json:"turn"`
+	}
+	if err := json.Unmarshal(completed.Params, &completion); err != nil {
+		return err
+	}
+	if completion.Turn.ID != started.Turn.ID || completion.Turn.Status != "interrupted" {
+		return fmt.Errorf("cancel did not interrupt original turn: %s", completed.Params)
+	}
+	return out.Encode(map[string]any{"check": "cross-client approval cancel interrupted original turn; primary received resolution", "passed": true,
+		"threadId": thread, "turnId": started.Turn.ID, "approval": approval, "resolved": resolved, "completion": completed})
 }

@@ -1,0 +1,201 @@
+{
+  "date": "2026-10-01",
+  "cliVersion": "0.159.3",
+  "appServerVersion": "0.159.3",
+  "model": "local fake Responses SSE provider; no real inference",
+  "originalClient": "Go probe, not CLI UI",
+  "checks": [
+    {
+      "check": "observer answered replayed questions after reconnect",
+      "completion": {
+        "method": "turn/completed",
+        "params": {
+          "threadId": "01a0f7c0-7dab-7903-a4ae-d10f04695c46",
+          "turn": {
+            "id": "01a0f7c0-7dd7-7c63-959c-85d873ecfa4e",
+            "items": [
+              {
+                "type": "agentMessage",
+                "id": "question-message-2",
+                "text": "PROBE-QUESTION-DONE",
+                "phase": null,
+                "memoryCitation": null,
+                "delivery": null,
+                "questions": null
+              }
+            ],
+            "itemsView": "summary",
+            "status": "completed",
+            "error": null,
+            "startedAt": 1790862982,
+            "completedAt": 1790862983,
+            "durationMs": 1221
+          }
+        }
+      },
+      "passed": true,
+      "primaryResolved": {
+        "method": "serverRequest/resolved",
+        "params": {
+          "threadId": "01a0f7c0-7dab-7903-a4ae-d10f04695c46",
+          "requestId": 6
+        }
+      },
+      "request": {
+        "id": 6,
+        "method": "item/tool/requestUserInput",
+        "params": {
+          "threadId": "01a0f7c0-7dab-7903-a4ae-d10f04695c46",
+          "turnId": "01a0f7c0-7dd7-7c63-959c-85d873ecfa4e",
+          "itemId": "question-call-1",
+          "questions": [
+            {
+              "id": "choice",
+              "header": "choice",
+              "question": "Choose choice?",
+              "isOther": true,
+              "isSecret": false,
+              "options": [
+                {
+                  "label": "A",
+                  "description": "First"
+                },
+                {
+                  "label": "B",
+                  "description": "Second"
+                }
+              ]
+            },
+            {
+              "id": "detail",
+              "header": "detail",
+              "question": "Choose detail?",
+              "isOther": true,
+              "isSecret": false,
+              "options": [
+                {
+                  "label": "A",
+                  "description": "First"
+                },
+                {
+                  "label": "B",
+                  "description": "Second"
+                }
+              ]
+            }
+          ],
+          "isBlocking": true,
+          "autoResolutionMs": null
+        }
+      },
+      "resolved": {
+        "method": "serverRequest/resolved",
+        "params": {
+          "threadId": "01a0f7c0-7dab-7903-a4ae-d10f04695c46",
+          "requestId": 6
+        }
+      },
+      "threadId": "01a0f7c0-7dab-7903-a4ae-d10f04695c46",
+      "turnId": "01a0f7c0-7dd7-7c63-959c-85d873ecfa4e"
+    },
+    {
+      "check": "primary skipped question; observer cleared pending and rejected stale answer",
+      "completion": {
+        "method": "turn/completed",
+        "params": {
+          "threadId": "01a0f7c0-7dab-7903-a4ae-d10f04695c46",
+          "turn": {
+            "id": "01a0f7c0-82ab-7f43-9181-b2decd2ffb96",
+            "items": [
+              {
+                "type": "agentMessage",
+                "id": "question-message-4",
+                "text": "PROBE-QUESTION-DONE",
+                "phase": null,
+                "memoryCitation": null,
+                "delivery": null,
+                "questions": null
+              }
+            ],
+            "itemsView": "summary",
+            "status": "completed",
+            "error": null,
+            "startedAt": 1790862983,
+            "completedAt": 1790862984,
+            "durationMs": 292
+          }
+        }
+      },
+      "passed": true,
+      "primaryResolved": {
+        "method": "serverRequest/resolved",
+        "params": {
+          "threadId": "01a0f7c0-7dab-7903-a4ae-d10f04695c46",
+          "requestId": 7
+        }
+      },
+      "request": {
+        "id": 7,
+        "method": "item/tool/requestUserInput",
+        "params": {
+          "threadId": "01a0f7c0-7dab-7903-a4ae-d10f04695c46",
+          "turnId": "01a0f7c0-82ab-7f43-9181-b2decd2ffb96",
+          "itemId": "question-call-3",
+          "questions": [
+            {
+              "id": "choice",
+              "header": "choice",
+              "question": "Choose choice?",
+              "isOther": true,
+              "isSecret": false,
+              "options": [
+                {
+                  "label": "A",
+                  "description": "First"
+                },
+                {
+                  "label": "B",
+                  "description": "Second"
+                }
+              ]
+            },
+            {
+              "id": "detail",
+              "header": "detail",
+              "question": "Choose detail?",
+              "isOther": true,
+              "isSecret": false,
+              "options": [
+                {
+                  "label": "A",
+                  "description": "First"
+                },
+                {
+                  "label": "B",
+                  "description": "Second"
+                }
+              ]
+            }
+          ],
+          "isBlocking": true,
+          "autoResolutionMs": null
+        }
+      },
+      "resolved": {
+        "method": "serverRequest/resolved",
+        "params": {
+          "threadId": "01a0f7c0-7dab-7903-a4ae-d10f04695c46",
+          "requestId": 7
+        }
+      },
+      "threadId": "01a0f7c0-7dab-7903-a4ae-d10f04695c46",
+      "turnId": "01a0f7c0-82ab-7f43-9181-b2decd2ffb96"
+    },
+    {
+      "check": "Other text reached subsequent model input; both turns completed",
+      "cwd": "/tmp/cc-connect-userinput-probe-658609933",
+      "passed": true,
+      "threadId": "01a0f7c0-7dab-7903-a4ae-d10f04695c46"
+    }
+  ]
+}

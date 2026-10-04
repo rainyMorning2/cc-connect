@@ -1,0 +1,119 @@
+{
+  "date": "2026-10-01",
+  "cliVersion": "0.159.3",
+  "appServerVersion": "0.159.3",
+  "model": "local fake Responses SSE provider; no real inference",
+  "originalClient": "Go probe, not CLI UI",
+  "checks": [
+    {
+      "check": "created isolated thread with local fake provider",
+      "cwd": "/tmp/cc-connect-daemon-probe-2761919457",
+      "passed": true,
+      "threadId": "01a0f7af-2b08-7d52-ab16-0cb09a376d6c"
+    },
+    {
+      "check": "second client resume: same active turn and pending approval",
+      "cwd": "/tmp/cc-connect-daemon-probe-2761919457",
+      "passed": true,
+      "threadId": "01a0f7af-2b08-7d52-ab16-0cb09a376d6c"
+    },
+    {
+      "check": "cross-client steer accepted for original active turn",
+      "cwd": "/tmp/cc-connect-daemon-probe-2761919457",
+      "passed": true,
+      "threadId": "01a0f7af-2b08-7d52-ab16-0cb09a376d6c"
+    },
+    {
+      "check": "observer reconnect preserved turn and replayed pending approval",
+      "cwd": "/tmp/cc-connect-daemon-probe-2761919457",
+      "passed": true,
+      "threadId": "01a0f7af-2b08-7d52-ab16-0cb09a376d6c"
+    },
+    {
+      "check": "secondary client declined approval; primary received resolution",
+      "cwd": "/tmp/cc-connect-daemon-probe-2761919457",
+      "passed": true,
+      "threadId": "01a0f7af-2b08-7d52-ab16-0cb09a376d6c"
+    },
+    {
+      "check": "live output and completion; steer marker reached model input",
+      "cwd": "/tmp/cc-connect-daemon-probe-2761919457",
+      "passed": true,
+      "threadId": "01a0f7af-2b08-7d52-ab16-0cb09a376d6c"
+    },
+    {
+      "approval": {
+        "id": 1,
+        "method": "item/commandExecution/requestApproval",
+        "params": {
+          "kind": "command",
+          "threadId": "01a0f7af-2b08-7d52-ab16-0cb09a376d6c",
+          "turnId": "01a0f7af-312e-72c0-930e-7a95056eb0f4",
+          "itemId": "probe-approval",
+          "startedAtMs": 1790861849041,
+          "environmentId": "local",
+          "reason": "CC Connect isolated probe; decline this request.",
+          "command": "/bin/bash -lc \"python3 -c 'print(42)'\"",
+          "cwd": "/tmp/cc-connect-daemon-probe-2761919457",
+          "commandActions": [
+            {
+              "type": "unknown",
+              "command": "python3 -c 'print(42)'"
+            }
+          ],
+          "proposedExecpolicyAmendment": [
+            "python3",
+            "-c",
+            "print(42)"
+          ],
+          "availableDecisions": [
+            "accept",
+            {
+              "acceptWithExecpolicyAmendment": {
+                "execpolicy_amendment": [
+                  "python3",
+                  "-c",
+                  "print(42)"
+                ]
+              }
+            },
+            "cancel"
+          ]
+        }
+      },
+      "check": "cross-client approval cancel interrupted original turn; primary received resolution",
+      "completion": {
+        "method": "turn/completed",
+        "params": {
+          "threadId": "01a0f7af-2b08-7d52-ab16-0cb09a376d6c",
+          "turn": {
+            "id": "01a0f7af-312e-72c0-930e-7a95056eb0f4",
+            "items": [],
+            "itemsView": "notLoaded",
+            "status": "interrupted",
+            "error": null,
+            "startedAt": 1790861848,
+            "completedAt": 1790861849,
+            "durationMs": 207
+          }
+        }
+      },
+      "passed": true,
+      "resolved": {
+        "method": "serverRequest/resolved",
+        "params": {
+          "threadId": "01a0f7af-2b08-7d52-ab16-0cb09a376d6c",
+          "requestId": 1
+        }
+      },
+      "threadId": "01a0f7af-2b08-7d52-ab16-0cb09a376d6c",
+      "turnId": "01a0f7af-312e-72c0-930e-7a95056eb0f4"
+    },
+    {
+      "check": "cross-client interrupt on separate test turn",
+      "cwd": "/tmp/cc-connect-daemon-probe-2761919457",
+      "passed": true,
+      "threadId": "01a0f7af-2b08-7d52-ab16-0cb09a376d6c"
+    }
+  ]
+}

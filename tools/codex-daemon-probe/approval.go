@@ -101,13 +101,7 @@ func (t *approvalTracker) observe(m message) error {
 	return nil
 }
 
-type approvalControl struct {
-	Action    string          `json:"action"`
-	RequestID json.RawMessage `json:"requestId,omitempty"`
-	Decision  string          `json:"decision,omitempty"`
-}
-
-func (t *approvalTracker) reply(control approvalControl, write func(any) error) error {
+func (t *approvalTracker) reply(control interactiveControl, write func(any) error) error {
 	key, err := approvalID(control.RequestID)
 	if err != nil {
 		return err
@@ -116,8 +110,8 @@ func (t *approvalTracker) reply(control approvalControl, write func(any) error) 
 	if !ok {
 		return fmt.Errorf("request is no longer pending or belongs to another thread")
 	}
-	if control.Decision != "accept" && control.Decision != "decline" {
-		return fmt.Errorf("only accept or decline is supported; no persistent policy changes")
+	if control.Decision != "accept" && control.Decision != "decline" && control.Decision != "cancel" {
+		return fmt.Errorf("only accept, decline or cancel is supported; no session or persistent policy changes")
 	}
 	if a.AvailableDecisions != nil {
 		allowed := false

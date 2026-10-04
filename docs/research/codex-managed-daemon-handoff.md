@@ -1,6 +1,48 @@
 # CC Connect managed daemon 接续记录
 
-更新：2026-09-30。换电脑、换 Codex 会话后，先读本文件。
+更新：2026-10-01。换电脑、换 Codex 会话后，先读本文件。
+
+**2026-10-02 阶段更新：** 已开始生产集成，新增的是 app_server 下的
+`app_server_transport = "managed_daemon"`，默认仍 stdio。Codex adapter、
+core 共享事件读取、审批/问答、attach/detach/steer/interrupt 已落代码，
+最新源码已移除普通 turn 定位上下文，改为工具 CLI 经本地 API 按 thread 自动绑定；
+该修正按用户要求尚未重新打包，旧 v2 二进制仍是先前实现。
+真实 daemon + 模拟模型的生产 adapter/Engine 链路通过；飞书/真人 CLI UI 未验收。
+随后已继续补齐 stdio 兼容性，含显示/TTS/hooks、cron/timer、relay、管理 API、
+历史/额度、工具调用上下文及 thread/delete；全量测试、CUJ、build、vet 和定向 race 通过。后续以
+[生产接入阶段记录](codex-managed-daemon-integration.md) 为准；下文“只有 probe”
+和“尚未集成”是此前阶段的记录，已过时。
+
+本次接续补齐 probe 的一次性 `cancel` 审批；命令/文件审批无 `other`，
+Other 属于独立问答请求。真实 daemon 0.159.3 + 隔离 probe/模拟模型的
+cancel 已通过（resolved + 原 turn interrupted），真实 CLI UI 未测。
+详见 [审批决策核对与证据](codex-managed-daemon-approval.md)。真实 CLI
+steer/interrupt 和 CC Connect 集成仍待进行。
+
+随后补齐 probe 问答：pending-questions/answer/skip，稳定问题 ID、Other
+文本、请求重放/重连、外部 resolved 和防重复。真实 daemon 0.159.3 +
+双 probe/模拟模型已通过；真实 CLI/飞书 UI 尚未测。
+详见 [问答接入验证](codex-managed-daemon-user-input.md)。
+
+interactive 随后补齐 status/steer：显式 expectedTurnId、单 reader 响应匹配、
+root/thread 隔离及失败不新建 turn。真实 daemon 0.159.3 + 双 probe/模拟
+模型通过新入口验收，含服务端 mismatch 与 completed-turn 拒绝。
+详见 [steer 验证](codex-managed-daemon-steer.md)。真实 CLI 行为仍待实测。
+
+用户随后要求真实模型验收：新建隔离 thread，使用 daemon 默认
+gpt-6.1-sol/openai（无 model/provider/config 覆盖），已通过双 probe steer。
+真实进度与最终回复按新指示改变，两端收到原 turn completed，打印命令仅
+执行一次。见 [真实模型记录](codex-managed-daemon-steer.md#真实模型验收通过)
+及 [证据](codex-managed-daemon-real-model-steer-result.json)。这已验证模型行为，
+但真人 CLI/Desktop UI 和 CC Connect/飞书仍待验收。
+
+随后完成真实模型 interrupt 与审批竞争：interactive 新增 interrupt，
+两端均收到原 turn interrupted，同 thread 恢复对话通过。注意 turn 中断
+不终止 unifiedExec 后台终端；测试显式 terminate 本次进程并验证停止。
+审批并发 accept/accept、accept/cancel、accept-first、cancel-first 全通过：
+服务端单次仲裁，最多一次执行，两端 resolved、旧 ID 防重复、连接可复用。
+详见 [interrupt 与竞争验收](codex-managed-daemon-interrupt-race.md) 和
+[真实模型证据](codex-managed-daemon-interrupt-race-result.json)。
 
 ## 目标与分支
 
@@ -45,9 +87,12 @@ Codex 源码 checkout、前端 dist、Go 缓存不随 Git 迁移。旧 thread ID
 | probe 回答，CLI 同步继续 | 通过 | resolved；用户确认 CLI 提示消失并继续 |
 | CLI 回答，probe 清除 pending | 通过 | 第二条 requestId 38；pending 空，命令输出和完成可见 |
 | 已解决审批再次回复 | 通过（本地防重复） | probe 收到 resolved 后拒绝旧 ID，没有再发响应 |
-| cross-client steer | 模拟模型通过，真实 CLI 待测 | self-test 确认文本进入后续模型 input，不能代替真实行为验收 |
-| cross-client interrupt | 模拟模型通过，真实 CLI 待测 | self-test 收到 interrupted，没有中断真实 CLI 任务 |
-| 两端同时点击审批的竞争行为 | 未实测 | 顺序同步测试不能证明并发竞争表现 |
+| 一次性 cancel | 真实 daemon/模拟模型通过 | 原 request resolved、原 turn interrupted；真实 CLI UI 未测 |
+| 问答、Other、skip、重连 | 真实 daemon/模拟模型通过 | 同一问答 ID 重放、答案进入后续 input、外部 resolved 清理；真实模型问答未测 |
+| cross-client steer | 真实模型通过 | gpt-6.1-sol/openai，双 probe 进度/最终回复改变，原 turn、单次命令保持；真人 CLI UI 未测 |
+| cross-client interrupt | 真实模型通过 | interactive 入口、两端原 turn interrupted、同 thread 恢复对话；后台终端须独立 terminate，已验证测试清理 |
+| 两个真实 thread 的隔离 | 本地单元测试通过，双真实 thread 未测 | 过滤与控制边界已覆盖；后续真实多任务验收与 Engine CUJ 仍需补 |
+| 两端同时点击审批的竞争行为 | 真实模型通过 | 双 probe 并发及先后到达四种组合，服务端只采用一个决定；最多一次执行，两端 resolved 和连接可复用 |
 | Desktop GUI 接入同一 daemon | 未实测 | 当前真实客户端是 Windows Terminal → WSL → Codex CLI |
 | CC Connect agent/Engine attach、审批、steer | 待实现和验证 | 后续真实 agent/Engine + 模拟平台边界，补 CUJ |
 | CLI/Desktop → CC Connect → 飞书 | 待实现和验证 | 用户手机端最终体验验收 |
@@ -106,13 +151,15 @@ interactive 每行一个 JSON；42 只是示例，换成真实 pending ID 并保
 ```json
 {"action":"pending"}
 {"action":"reply","requestId":42,"decision":"accept"}
+{"action":"interrupt","expectedTurnId":"<ATTACHED_ACTIVE_TURN_ID>"}
 {"action":"detach"}
 ```
 
 只处理目标 thread 的 commandExecution/fileChange 审批，不自动审批。
-支持 accept/decline，且实际 availableDecisions 必须提供所选决策。
-本次真实请求提供 accept/cancel，不提供 decline；当前工具尚不能验收真实
-cancel 路径。不修改持久策略。approvalReplySent 只表示发送成功，要用
+支持 accept/decline/cancel，且实际 availableDecisions 必须提供所选决策。
+此前真实 CLI 请求提供 accept/cancel，不提供 decline；cancel 现已补齐，
+通过隔离真实 daemon/模拟模型验证，CLI UI 仍待实测。不修改持久策略。
+approvalReplySent 只表示发送成功，要用
 resolved + 结果确认。detach/超时只关自身连接。
 
 | 文件（tools/codex-daemon-probe/ 下） | 用途 |
@@ -123,16 +170,19 @@ resolved + 结果确认。detach/超时只关自身连接。
 | approval.go | pending、resolved 清理、thread 过滤、原类型 ID、防重复回复 |
 | interactive.go | 单 reader、stdin 控制、单循环拥有状态和 writer |
 | client_test.go、approval_test.go | 本地 UDS fixture、审批回归测试 |
+| steer.go、interrupt_test.go | steer/interrupt 单 reader 响应匹配与 turn 绑定测试 |
+| real_controls_test.go | opt-in 真实模型 interrupt、后台终端清理与审批竞争 |
 
-interactive **尚无 steer/interrupt action**。真实 steer 测试需要先补受限
-入口或单独小工具。不要让 request() 与后台事件 reader 同时读一个 WS；
-当前 probe 不是生产 dispatcher，扩展时要保持单 reader 或使用独立连接。
+interactive **已支持 status/steer/interrupt**。interrupt 必须显式 expectedTurnId，
+RPC accepted 与 turn interrupted 分开确认，不自动清理后台终端。真实 steer 测试
+可直接使用新入口；不要让 request() 与后台事件 reader 同时读一个 WS。
+当前实现保持单 reader，主循环匹配 steer 响应；不是生产多 session dispatcher。
 
 ## 下一步：真实 CLI cross-client steer
 
 1. 用户新建专用空目录及 CLI 会话，保持 CLI 打开，启动约 180 秒的打印任务；
    agent 定期回复进度。不改文件、不联网，不用承载开发工作的会话。
-2. probe resume，获取明确 threadId 和 active turn ID；添加显式 steer 入口，
+2. probe resume，获取明确 threadId 和 active turn ID；使用 interactive steer 入口，
    `turn/steer` 带 threadId、expectedTurnId、text input，只控制指定 root thread。
    例如 input：`[{"type":"text","text":"后续进度回复以 STEER-SEEN 开头，最终回复 STEER-E2E-DONE；不要重跑当前命令。"}]`。
 3. 既检查 RPC 返回原 turn ID，也检查真实 agent 后续行为改变，两边看到
@@ -140,7 +190,8 @@ interactive **尚无 steer/interrupt action**。真实 steer 测试需要先补�
    steer 不等于改变或杀掉已运行的 OS 命令，应检查模型随后行为。
 4. 测 expectedTurnId 过期/turn 已结束：明确失败，不能自动变成 turn/start。
    保存实际版本、控制请求、两端可见结果和完成事件。
-5. 再补真实 interrupt、重连 pending approval 的组合验收，推进正式集成。
+5. 真实模型双 probe interrupt 与审批竞争已完成；真人 CLI UI 与真实模型问答
+   仍待验收。接入生产 agent/Engine 后补 CUJ 和飞书用户旅程。
 
 ## 集成约束
 

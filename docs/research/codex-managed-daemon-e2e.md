@@ -5,6 +5,18 @@
 当前分支只有独立 probe，尚未把 daemon 接入 CC Connect agent 或消息平台。
 `-self-test` 的成功不能算 Desktop/CLI → CC Connect → 消息平台的端到端成功。
 
+2026-10-01 接续：probe 已补齐一次性 cancel；命令/文件审批无 other，
+Other 属于问答请求。真实 daemon + 隔离 probe/模拟模型验证了 cancel 的
+resolved 和 interrupted，详见 [审批决策核对](codex-managed-daemon-approval.md)。
+下文 09-30 记录保持原验收范围；当前 interactive 支持 accept/decline/cancel。
+问答的重放、Other 回复和外部 skip/resolved 也已通过隔离双 probe/模拟模型
+验证，见 [问答记录](codex-managed-daemon-user-input.md)；真实 CLI UI 尚未实测。
+interactive status/steer 已实现，新的单 reader 入口和服务端失败路径通过
+真实 daemon/模拟模型验证，见 [steer 记录](codex-managed-daemon-steer.md)。
+随后真实 daemon 默认模型 gpt-6.1-sol/openai 的双 probe steer 也已通过，
+后续行为实际改变，见 [真实模型证据](codex-managed-daemon-real-model-steer-result.json)。
+本轮客户端为 probe，仍不声称真人 CLI/Desktop 或飞书 UI 已验收。
+
 ## 2026-09-30 真实客户端实测：通过
 
 用户创建了专用测试 thread `01a0f1a3-916d-78a0-9541-b00864547127`，
@@ -191,3 +203,12 @@ stdio 原有 CUJ 同时保持通过。daemon 不运行时必须报连接失败�
 每项验收记录：客户端/daemon/CC 版本、thread ID、turn ID、动作时间、
 平台实际可见结果，以及对应 RPC 成功或失败。仅历史列表可见、仅 RPC
 返回成功、或只有 probe 测试通过，都不能代替这个最终用户视角的验收。
+
+
+## 2026-10-01：真实模型 interrupt 与审批竞争
+
+双 probe / 现有 daemon 0.159.3 / 默认 gpt-6.1-sol-openai 验证通过。
+interrupt 两端同 turn interrupted，同 thread 恢复对话；unifiedExec 后台
+命令仍存活，显式 terminate 后停止。并发审批四种组合仅一个决定生效，
+最多执行一次，两端 resolved、旧 ID 拒绝、连接保持可用。
+见 [完整验收及边界](codex-managed-daemon-interrupt-race.md)。真人 CLI UI 未测。

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -24,7 +25,7 @@ func TestApprovalReplyCannotTargetAnotherThreadOrUnsupportedRequest(t *testing.T
 		}
 	}
 	for _, id := range []string{`1`, `2`} {
-		err := tracker.reply(approvalControl{RequestID: json.RawMessage(id), Decision: "accept"}, func(any) error { t.Fatal("wrote unauthorized reply"); return nil })
+		err := tracker.reply(interactiveControl{RequestID: json.RawMessage(id), Decision: "accept"}, func(any) error { t.Fatal("wrote unauthorized reply"); return nil })
 		if err == nil {
 			t.Fatal("allowed unrelated request")
 		}
@@ -50,12 +51,12 @@ func TestResolvedApprovalRejectsStaleReplyAndPreservesOtherRequest(t *testing.T)
 	if len(tracker.pending) != 1 {
 		t.Fatal("resolution removed wrong requests")
 	}
-	if err := tracker.reply(approvalControl{RequestID: json.RawMessage(`42`), Decision: "accept"}, func(any) error { t.Fatal("stale reply written"); return nil }); err == nil {
+	if err := tracker.reply(interactiveControl{RequestID: json.RawMessage(`42`), Decision: "accept"}, func(any) error { t.Fatal("stale reply written"); return nil }); err == nil {
 		t.Fatal("allowed stale reply")
 	}
 	writes := 0
 	for i := 0; i < 2; i++ {
-		err := tracker.reply(approvalControl{RequestID: json.RawMessage(`"42"`), Decision: "decline"}, func(any) error { writes++; return nil })
+		err := tracker.reply(interactiveControl{RequestID: json.RawMessage(`"42"`), Decision: "decline"}, func(any) error { writes++; return nil })
 		if (err == nil) != (i == 0) {
 			t.Fatalf("reply %d err=%v", i, err)
 		}
@@ -72,13 +73,52 @@ func TestApprovalRejectsPersistentAndUnavailableDecisions(t *testing.T) {
 	if err := tracker.observe(m); err != nil {
 		t.Fatal(err)
 	}
-	for _, decision := range []string{"acceptForSession", "accept"} {
-		if err := tracker.reply(approvalControl{RequestID: json.RawMessage(`5`), Decision: decision}, func(any) error { t.Fatal("unsupported decision written"); return nil }); err == nil {
+	for _, decision := range []string{"acceptForSession", "accept", "cancel", "other"} {
+		if err := tracker.reply(interactiveControl{RequestID: json.RawMessage(`5`), Decision: decision}, func(any) error { t.Fatal("unsupported decision written"); return nil }); err == nil {
 			t.Fatal("allowed unsupported decision")
 		}
 	}
 	if len(tracker.pending) != 1 {
 		t.Fatal("rejected input removed pending request")
+	}
+}
+
+func TestApprovalCancelOfferedDecisionUsesOriginalRequestID(t *testing.T) {
+	for _, method := range []string{"item/commandExecution/requestApproval", "item/fileChange/requestApproval"} {
+		t.Run(method, func(t *testing.T) {
+			tracker := &approvalTracker{thread: "target", pending: map[string]pendingApproval{}}
+			m := message{ID: json.RawMessage(`"cancel-1"`), Method: method,
+				Params: json.RawMessage(`{"threadId":"target","turnId":"turn"}`)}
+			if method == "item/commandExecution/requestApproval" {
+				m.Params = json.RawMessage(`{"threadId":"target","turnId":"turn","availableDecisions":["accept","cancel"]}`)
+			}
+			if err := tracker.observe(m); err != nil {
+				t.Fatal(err)
+			}
+			cmd := interactiveControl{RequestID: m.ID, Decision: "cancel"}
+			writeErr := errors.New("write failed")
+			if err := tracker.reply(cmd, func(any) error { return writeErr }); !errors.Is(err, writeErr) {
+				t.Fatalf("cancel did not reach writer: %v", err)
+			}
+			if len(tracker.pending) != 1 {
+				t.Fatal("failed write removed approval")
+			}
+			if err := tracker.reply(cmd, func(v any) error {
+				wire, err := json.Marshal(v)
+				if err != nil {
+					return err
+				}
+				if string(wire) != `{"id":"cancel-1","result":{"decision":"cancel"}}` {
+					t.Fatalf("wrong cancel response: %s", wire)
+				}
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if err := tracker.reply(cmd, func(any) error { t.Fatal("duplicate cancel written"); return nil }); err == nil {
+				t.Fatal("allowed duplicate cancel")
+			}
+		})
 	}
 }
 
@@ -96,75 +136,88 @@ func TestCompletedOldTurnDoesNotClearNewTurnApproval(t *testing.T) {
 }
 
 func TestInteractiveApprovalWireResponseAndResolvedNotification(t *testing.T) {
-	socket := fixture(t, func(ws *websocket.Conn) {
-		if err := ws.WriteJSON(approvalMessage(`"approval-1"`, "target", "turn")); err != nil {
-			t.Error(err)
-			return
-		}
-		var response message
-		if err := ws.ReadJSON(&response); err != nil {
-			t.Error(err)
-			return
-		}
-		if string(response.ID) != `"approval-1"` || string(response.Result) != `{"decision":"accept"}` || response.Method != "" {
-			t.Errorf("wrong approval response: %+v", response)
-		}
-		_ = ws.WriteJSON(message{Method: "serverRequest/resolved", Params: json.RawMessage(`{"threadId":"target","requestId":"approval-1"}`)})
-		if _, _, err := ws.ReadMessage(); err == nil {
-			t.Error("duplicate approval response sent")
-		}
-	})
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	c, err := connect(ctx, socket)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.close()
-	inR, inW := io.Pipe()
-	defer inR.Close()
-	defer inW.Close()
-	outR, outW := io.Pipe()
-	defer outR.Close()
-	defer outW.Close()
-	lines := make(chan map[string]json.RawMessage, 16)
-	go func() {
-		s := bufio.NewScanner(outR)
-		for s.Scan() {
-			var m map[string]json.RawMessage
-			if json.Unmarshal(s.Bytes(), &m) == nil {
-				lines <- m
-			}
-		}
-	}()
-	done := make(chan error, 1)
-	go func() { done <- watchInteractive(ctx, c, "target", json.NewEncoder(outW), inR) }()
-	wait := func(key, value string) {
-		t.Helper()
-		for {
-			select {
-			case m := <-lines:
-				if string(m[key]) == value {
-					return
+	for _, method := range []string{"item/commandExecution/requestApproval", "item/fileChange/requestApproval"} {
+		for _, decision := range []string{"accept", "decline", "cancel"} {
+			t.Run(method+"/"+decision, func(t *testing.T) {
+				socket := fixture(t, func(ws *websocket.Conn) {
+					approval := message{ID: json.RawMessage(`"approval-1"`), Method: method,
+						Params: json.RawMessage(`{"threadId":"target","turnId":"turn"}`)}
+					if method == "item/commandExecution/requestApproval" {
+						approval.Params = json.RawMessage(`{"threadId":"target","turnId":"turn","availableDecisions":["accept","decline","cancel"]}`)
+					}
+					if err := ws.WriteJSON(approval); err != nil {
+						t.Error(err)
+						return
+					}
+					var response message
+					if err := ws.ReadJSON(&response); err != nil {
+						t.Error(err)
+						return
+					}
+					if string(response.ID) != `"approval-1"` || string(response.Result) != `{"decision":"`+decision+`"}` || response.Method != "" {
+						t.Errorf("wrong approval response: %+v", response)
+					}
+					_ = ws.WriteJSON(message{Method: "serverRequest/resolved", Params: json.RawMessage(`{"threadId":"target","requestId":"approval-1"}`)})
+					if _, _, err := ws.ReadMessage(); err == nil {
+						t.Error("duplicate approval response sent")
+					}
+				})
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				c, err := connect(ctx, socket)
+				if err != nil {
+					t.Fatal(err)
 				}
-			case <-ctx.Done():
-				t.Fatal("interactive test timed out")
-			}
+				defer c.close()
+				inR, inW := io.Pipe()
+				defer inR.Close()
+				defer inW.Close()
+				outR, outW := io.Pipe()
+				defer outR.Close()
+				defer outW.Close()
+				lines := make(chan map[string]json.RawMessage, 16)
+				go func() {
+					s := bufio.NewScanner(outR)
+					for s.Scan() {
+						var m map[string]json.RawMessage
+						if json.Unmarshal(s.Bytes(), &m) == nil {
+							lines <- m
+						}
+					}
+				}()
+				done := make(chan error, 1)
+				go func() {
+					done <- watchInteractive(ctx, c, "target", json.NewEncoder(outW), inR, testTurnSnapshot("target", ""))
+				}()
+				wait := func(key, value string) {
+					t.Helper()
+					for {
+						select {
+						case m := <-lines:
+							if string(m[key]) == value {
+								return
+							}
+						case <-ctx.Done():
+							t.Fatal("interactive test timed out")
+						}
+					}
+				}
+				wait("method", `"`+method+`"`)
+				_, _ = io.WriteString(inW, "{\"action\":\"reply\",\"requestId\":\"approval-1\",\"decision\":\""+decision+"\"}\n")
+				wait("probe", `"approvalReplySent"`)
+				wait("method", `"serverRequest/resolved"`)
+				_, _ = io.WriteString(inW, "{\"action\":\"reply\",\"requestId\":\"approval-1\",\"decision\":\""+decision+"\"}\n")
+				wait("probe", `"controlRejected"`)
+				_, _ = io.WriteString(inW, "{\"action\":\"detach\"}\n")
+				select {
+				case err := <-done:
+					if err != nil {
+						t.Fatal(err)
+					}
+				case <-ctx.Done():
+					t.Fatal("detach did not stop watcher")
+				}
+			})
 		}
-	}
-	wait("method", `"item/commandExecution/requestApproval"`)
-	_, _ = io.WriteString(inW, "{\"action\":\"reply\",\"requestId\":\"approval-1\",\"decision\":\"accept\"}\n")
-	wait("probe", `"approvalReplySent"`)
-	wait("method", `"serverRequest/resolved"`)
-	_, _ = io.WriteString(inW, "{\"action\":\"reply\",\"requestId\":\"approval-1\",\"decision\":\"accept\"}\n")
-	wait("probe", `"controlRejected"`)
-	_, _ = io.WriteString(inW, "{\"action\":\"detach\"}\n")
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
-		}
-	case <-ctx.Done():
-		t.Fatal("detach did not stop watcher")
 	}
 }

@@ -1,0 +1,172 @@
+{
+  "date": "2026-10-01",
+  "cliVersion": "0.159.3",
+  "appServerVersion": "0.159.3",
+  "model": "local fake Responses SSE provider; no real inference",
+  "originalClient": "Go probe, not CLI UI",
+  "observations": [
+    {
+      "check": "created isolated thread with local fake provider",
+      "cwd": "/tmp/cc-connect-daemon-probe-1222788367",
+      "passed": true,
+      "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b"
+    },
+    {
+      "check": "second client resume: same active turn and pending approval",
+      "cwd": "/tmp/cc-connect-daemon-probe-1222788367",
+      "passed": true,
+      "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b"
+    },
+    {
+      "check": "daemon rejected steer: active turn mismatch",
+      "error": "turn/steer: RPC -32600: expected active turn id `not-the-active-turn` but found `01a0f7c6-9cde-7991-8203-931cb799b595`",
+      "expectedTurnId": "not-the-active-turn",
+      "passed": true,
+      "request": {
+        "expectedTurnId": "not-the-active-turn",
+        "input": [
+          {
+            "text": "cc-connect-rejected-steer-marker",
+            "text_elements": [],
+            "type": "text"
+          }
+        ],
+        "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b"
+      },
+      "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b"
+    },
+    {
+      "probe": "controlRejected",
+      "reason": "expectedTurnId does not match an attached active turn"
+    },
+    {
+      "expectedTurnId": "01a0f7c6-9cde-7991-8203-931cb799b595",
+      "probe": "steerRequestSent",
+      "requestId": 4,
+      "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b"
+    },
+    {
+      "expectedTurnId": "01a0f7c6-9cde-7991-8203-931cb799b595",
+      "probe": "steerAccepted",
+      "requestId": 4,
+      "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b",
+      "turnId": "01a0f7c6-9cde-7991-8203-931cb799b595"
+    },
+    {
+      "check": "cross-client steer accepted for original active turn",
+      "cwd": "/tmp/cc-connect-daemon-probe-1222788367",
+      "passed": true,
+      "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b"
+    },
+    {
+      "check": "observer reconnect preserved turn and replayed pending approval",
+      "cwd": "/tmp/cc-connect-daemon-probe-1222788367",
+      "passed": true,
+      "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b"
+    },
+    {
+      "check": "secondary client declined approval; primary received resolution",
+      "cwd": "/tmp/cc-connect-daemon-probe-1222788367",
+      "passed": true,
+      "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b"
+    },
+    {
+      "check": "live output and completion; steer marker reached model input",
+      "cwd": "/tmp/cc-connect-daemon-probe-1222788367",
+      "passed": true,
+      "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b"
+    },
+    {
+      "check": "daemon rejected steer: turn already completed",
+      "error": "turn/steer: RPC -32600: no active turn to steer",
+      "expectedTurnId": "01a0f7c6-9cde-7991-8203-931cb799b595",
+      "passed": true,
+      "request": {
+        "expectedTurnId": "01a0f7c6-9cde-7991-8203-931cb799b595",
+        "input": [
+          {
+            "text": "cc-connect-rejected-steer-marker",
+            "text_elements": [],
+            "type": "text"
+          }
+        ],
+        "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b"
+      },
+      "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b"
+    },
+    {
+      "approval": {
+        "id": 9,
+        "method": "item/commandExecution/requestApproval",
+        "params": {
+          "kind": "command",
+          "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b",
+          "turnId": "01a0f7c6-b188-7f02-a74a-b05b6c113d68",
+          "itemId": "probe-approval",
+          "startedAtMs": 1790863389178,
+          "environmentId": "local",
+          "reason": "CC Connect isolated probe; decline this request.",
+          "command": "/bin/bash -lc \"python3 -c 'print(42)'\"",
+          "cwd": "/tmp/cc-connect-daemon-probe-1222788367",
+          "commandActions": [
+            {
+              "type": "unknown",
+              "command": "python3 -c 'print(42)'"
+            }
+          ],
+          "proposedExecpolicyAmendment": [
+            "python3",
+            "-c",
+            "print(42)"
+          ],
+          "availableDecisions": [
+            "accept",
+            {
+              "acceptWithExecpolicyAmendment": {
+                "execpolicy_amendment": [
+                  "python3",
+                  "-c",
+                  "print(42)"
+                ]
+              }
+            },
+            "cancel"
+          ]
+        }
+      },
+      "check": "cross-client approval cancel interrupted original turn; primary received resolution",
+      "completion": {
+        "method": "turn/completed",
+        "params": {
+          "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b",
+          "turn": {
+            "id": "01a0f7c6-b188-7f02-a74a-b05b6c113d68",
+            "items": [],
+            "itemsView": "notLoaded",
+            "status": "interrupted",
+            "error": null,
+            "startedAt": 1790863389,
+            "completedAt": 1790863389,
+            "durationMs": 138
+          }
+        }
+      },
+      "passed": true,
+      "resolved": {
+        "method": "serverRequest/resolved",
+        "params": {
+          "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b",
+          "requestId": 9
+        }
+      },
+      "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b",
+      "turnId": "01a0f7c6-b188-7f02-a74a-b05b6c113d68"
+    },
+    {
+      "check": "cross-client interrupt on separate test turn",
+      "cwd": "/tmp/cc-connect-daemon-probe-1222788367",
+      "passed": true,
+      "threadId": "01a0f7c6-9caf-7a02-a407-9afaa703398b"
+    }
+  ]
+}

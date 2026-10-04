@@ -1,0 +1,185 @@
+{
+  "date": "2026-10-01",
+  "runtime": "real existing managed daemon",
+  "model": "gpt-6.1-sol",
+  "modelProvider": "openai",
+  "appServerVersion": "0.159.3",
+  "modelOrProviderOverride": false,
+  "clients": "two Go probes; human CLI/Desktop UI not tested",
+  "interrupt": {
+    "threadId": "01a0f7da-4a60-7b52-bb12-f2aea9addfff",
+    "evidencePath": "/tmp/cc-connect-real-controls-708143865/evidence.jsonl",
+    "checks": [
+      {
+        "processId": "23473",
+        "processStoppedByInterrupt": false,
+        "pythonNamespacePid": 2,
+        "pythonOSPid": 31837,
+        "result": "interrupt",
+        "status": "interrupted",
+        "turnId": "01a0f7da-4a88-75c1-92cb-8c15900bb5d7"
+      },
+      {
+        "processId": "23473",
+        "processStopped": true,
+        "result": "backgroundTerminalCleanup",
+        "terminated": true
+      }
+    ],
+    "primaryCompletions": [
+      {
+        "side": "primary-after-interrupt",
+        "turnId": "01a0f7da-4a88-75c1-92cb-8c15900bb5d7",
+        "status": "interrupted"
+      },
+      {
+        "side": "primary-recovery",
+        "turnId": "01a0f7da-7853-7b33-b770-ec9283f9d183",
+        "status": "completed"
+      }
+    ],
+    "observerCompletions": [
+      {
+        "id": "01a0f7da-4a88-75c1-92cb-8c15900bb5d7",
+        "status": "interrupted"
+      }
+    ],
+    "staleTurnRejected": true,
+    "rpcAccepted": true,
+    "boundary": "turn interrupted; unifiedExec background terminal survives; explicit terminate verified"
+  },
+  "approvalRace": [
+    {
+      "case": "bothAccept",
+      "threadId": "01a0f7db-146f-7a01-9c59-eb405ff01940",
+      "approvalsReviewer": "user",
+      "evidencePath": "/tmp/cc-connect-real-controls-994206854/evidence.jsonl",
+      "clientWrites": [
+        {
+          "decision": "accept",
+          "requestId": 10,
+          "sendEnded": "2026-10-01T14:25:32.806705257Z",
+          "sendStarted": "2026-10-01T14:25:32.806566165Z",
+          "side": 1,
+          "writeOK": true
+        },
+        {
+          "decision": "accept",
+          "requestId": 10,
+          "sendEnded": "2026-10-01T14:25:32.806942579Z",
+          "sendStarted": "2026-10-01T14:25:32.806681498Z",
+          "side": 0,
+          "writeOK": true
+        }
+      ],
+      "bothResolved": true,
+      "connectionsReusable": true,
+      "decisionA": "accept",
+      "decisionB": "accept",
+      "executions": 1,
+      "requestId": 10,
+      "result": "approvalRace",
+      "status": "completed",
+      "turnId": "01a0f7db-14a1-74f1-ba38-6719f38cbd9b"
+    },
+    {
+      "case": "conflictSimultaneous",
+      "threadId": "01a0f7db-3d9c-7053-a29a-3e3d0a396666",
+      "approvalsReviewer": "user",
+      "evidencePath": "/tmp/cc-connect-real-controls-1430083311/evidence.jsonl",
+      "clientWrites": [
+        {
+          "decision": "cancel",
+          "requestId": 11,
+          "sendEnded": "2026-10-01T14:25:42.092182169Z",
+          "sendStarted": "2026-10-01T14:25:42.092047456Z",
+          "side": 1,
+          "writeOK": true
+        },
+        {
+          "decision": "accept",
+          "requestId": 11,
+          "sendEnded": "2026-10-01T14:25:42.092258703Z",
+          "sendStarted": "2026-10-01T14:25:42.092116666Z",
+          "side": 0,
+          "writeOK": true
+        }
+      ],
+      "bothResolved": true,
+      "connectionsReusable": true,
+      "decisionA": "accept",
+      "decisionB": "cancel",
+      "executions": 1,
+      "requestId": 11,
+      "result": "approvalRace",
+      "status": "completed",
+      "turnId": "01a0f7db-3dca-76d3-b4be-74f608c1075f"
+    },
+    {
+      "case": "acceptFirst",
+      "threadId": "01a0f7db-5fe7-7873-b01b-b223c7fd3cb5",
+      "approvalsReviewer": "user",
+      "evidencePath": "/tmp/cc-connect-real-controls-1737878851/evidence.jsonl",
+      "clientWrites": [
+        {
+          "decision": "accept",
+          "requestId": 12,
+          "sendEnded": "2026-10-01T14:25:51.614216421Z",
+          "sendStarted": "2026-10-01T14:25:51.614088601Z",
+          "side": 0,
+          "writeOK": true
+        },
+        {
+          "decision": "cancel",
+          "requestId": 12,
+          "sendEnded": "2026-10-01T14:25:51.714461471Z",
+          "sendStarted": "2026-10-01T14:25:51.71417922Z",
+          "side": 1,
+          "writeOK": true
+        }
+      ],
+      "bothResolved": true,
+      "connectionsReusable": true,
+      "decisionA": "accept",
+      "decisionB": "cancel",
+      "executions": 1,
+      "requestId": 12,
+      "result": "approvalRace",
+      "status": "completed",
+      "turnId": "01a0f7db-6012-72e1-9d46-0ab799b64f58"
+    },
+    {
+      "case": "cancelFirst",
+      "threadId": "01a0f7db-8684-7e02-b3bc-cb193c17bc93",
+      "approvalsReviewer": "user",
+      "evidencePath": "/tmp/cc-connect-real-controls-2667959119/evidence.jsonl",
+      "clientWrites": [
+        {
+          "decision": "cancel",
+          "requestId": 13,
+          "sendEnded": "2026-10-01T14:26:01.254295114Z",
+          "sendStarted": "2026-10-01T14:26:01.254091801Z",
+          "side": 1,
+          "writeOK": true
+        },
+        {
+          "decision": "accept",
+          "requestId": 13,
+          "sendEnded": "2026-10-01T14:26:01.355698606Z",
+          "sendStarted": "2026-10-01T14:26:01.355366842Z",
+          "side": 0,
+          "writeOK": true
+        }
+      ],
+      "bothResolved": true,
+      "connectionsReusable": true,
+      "decisionA": "accept",
+      "decisionB": "cancel",
+      "executions": 0,
+      "requestId": 13,
+      "result": "approvalRace",
+      "status": "interrupted",
+      "turnId": "01a0f7db-86b3-7b33-97bb-c13c0b4dc7d3"
+    }
+  ]
+}

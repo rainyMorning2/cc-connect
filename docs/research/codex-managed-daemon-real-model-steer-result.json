@@ -1,0 +1,164 @@
+{
+  "date": "2026-10-01",
+  "realModel": true,
+  "cliVersion": "0.159.3",
+  "appServerVersion": "0.159.3",
+  "model": "gpt-6.1-sol",
+  "modelProvider": "openai",
+  "providerOverride": false,
+  "originalClient": "Go probe; real CLI/Desktop UI not exercised",
+  "threadId": "01a0f7cc-70e8-7850-abdc-65975ee39cad",
+  "turnId": "01a0f7cc-7112-7e93-afbb-46591e8f7ea8",
+  "cwd": "/tmp/cc-connect-real-steer-3429572596",
+  "steerControl": {
+    "action": "steer",
+    "expectedTurnId": "01a0f7cc-7112-7e93-afbb-46591e8f7ea8",
+    "text": "这是中途调整：继续等待原来的打印进程结束，不要中断或重跑命令。下一条进度回复必须以 STEER-SEEN-1790863775820182352 开头，说明已经收到调整；最终只回复 STEER-REAL-DONE-1790863775820182352，替代原来的 baseline 标记。"
+  },
+  "steerAccepted": {
+    "expectedTurnId": "01a0f7cc-7112-7e93-afbb-46591e8f7ea8",
+    "probe": "steerAccepted",
+    "requestId": 3,
+    "threadId": "01a0f7cc-70e8-7850-abdc-65975ee39cad",
+    "turnId": "01a0f7cc-7112-7e93-afbb-46591e8f7ea8"
+  },
+  "observedTurnStartedIds": [
+    "01a0f7cc-7112-7e93-afbb-46591e8f7ea8"
+  ],
+  "commandStartedCount": 1,
+  "commandCompletedCount": 1,
+  "commandResult": {
+    "type": "commandExecution",
+    "id": "exec-8c61833d-1596-4246-90dd-98321064fa7e",
+    "pluginId": null,
+    "scriptPath": null,
+    "command": "/bin/bash -lc \"python3 -u -c 'import time; [(print(\\\"REAL-STEER-TICK\\\", i, flush=True), time.sleep(2)) for i in range(25)]'\"",
+    "cwd": "/tmp/cc-connect-real-steer-3429572596",
+    "processId": "66575",
+    "source": "unifiedExecStartup",
+    "status": "completed",
+    "commandActions": [
+      {
+        "type": "unknown",
+        "command": "python3 -u -c 'import time; [(print(\"REAL-STEER-TICK\", i, flush=True), time.sleep(2)) for i in range(25)]'"
+      }
+    ],
+    "aggregatedOutput": "REAL-STEER-TICK 0\nREAL-STEER-TICK 1\nREAL-STEER-TICK 2\nREAL-STEER-TICK 3\nREAL-STEER-TICK 4\nREAL-STEER-TICK 5\nREAL-STEER-TICK 6\nREAL-STEER-TICK 7\nREAL-STEER-TICK 8\nREAL-STEER-TICK 9\nREAL-STEER-TICK 10\nREAL-STEER-TICK 11\nREAL-STEER-TICK 12\nREAL-STEER-TICK 13\nREAL-STEER-TICK 14\nREAL-STEER-TICK 15\nREAL-STEER-TICK 16\nREAL-STEER-TICK 17\nREAL-STEER-TICK 18\nREAL-STEER-TICK 19\nREAL-STEER-TICK 20\nREAL-STEER-TICK 21\nREAL-STEER-TICK 22\nREAL-STEER-TICK 23\nREAL-STEER-TICK 24\n",
+    "exitCode": 0,
+    "durationMs": 49955
+  },
+  "primaryAgentMessages": [
+    {
+      "type": "agentMessage",
+      "id": "msg_0b381d465cef832e016abe699bc58887d08e06a47df89fe475",
+      "text": "我会只执行一次指定命令，随后轮询同一个进程，并简短报告进度。",
+      "phase": "commentary",
+      "memoryCitation": null,
+      "delivery": null,
+      "questions": null
+    },
+    {
+      "type": "agentMessage",
+      "id": "msg_0b381d465cef832e016abe69a77a9487d0954be4dbe9a48454",
+      "text": "STEER-SEEN-1790863775820182352 已收到调整，将继续等待原来的打印进程结束，不中断或重跑命令。",
+      "phase": "commentary",
+      "memoryCitation": null,
+      "delivery": null,
+      "questions": null
+    },
+    {
+      "type": "agentMessage",
+      "id": "msg_0b381d465cef832e016abe69bebacc87d0a1383f3bc6071029",
+      "text": "原进程已打印到 REAL-STEER-TICK 15，继续等待结束。",
+      "phase": "commentary",
+      "memoryCitation": null,
+      "delivery": null,
+      "questions": null
+    },
+    {
+      "type": "agentMessage",
+      "id": "msg_0b381d465cef832e016abe69d144e887d0b507abec1ea2828d",
+      "text": "STEER-REAL-DONE-1790863775820182352",
+      "phase": "final_answer",
+      "memoryCitation": null,
+      "delivery": null,
+      "questions": null
+    }
+  ],
+  "observerAgentMessages": [
+    {
+      "type": "agentMessage",
+      "id": "msg_0b381d465cef832e016abe69a77a9487d0954be4dbe9a48454",
+      "text": "STEER-SEEN-1790863775820182352 已收到调整，将继续等待原来的打印进程结束，不中断或重跑命令。",
+      "phase": "commentary",
+      "memoryCitation": null,
+      "delivery": null,
+      "questions": null
+    },
+    {
+      "type": "agentMessage",
+      "id": "msg_0b381d465cef832e016abe69bebacc87d0a1383f3bc6071029",
+      "text": "原进程已打印到 REAL-STEER-TICK 15，继续等待结束。",
+      "phase": "commentary",
+      "memoryCitation": null,
+      "delivery": null,
+      "questions": null
+    },
+    {
+      "type": "agentMessage",
+      "id": "msg_0b381d465cef832e016abe69d144e887d0b507abec1ea2828d",
+      "text": "STEER-REAL-DONE-1790863775820182352",
+      "phase": "final_answer",
+      "memoryCitation": null,
+      "delivery": null,
+      "questions": null
+    }
+  ],
+  "primaryCompletion": {
+    "threadId": "01a0f7cc-70e8-7850-abdc-65975ee39cad",
+    "turn": {
+      "id": "01a0f7cc-7112-7e93-afbb-46591e8f7ea8",
+      "items": [
+        {
+          "type": "agentMessage",
+          "id": "msg_0b381d465cef832e016abe69d144e887d0b507abec1ea2828d",
+          "text": "STEER-REAL-DONE-1790863775820182352",
+          "phase": "final_answer",
+          "memoryCitation": null,
+          "delivery": null,
+          "questions": null
+        }
+      ],
+      "itemsView": "summary",
+      "status": "completed",
+      "error": null,
+      "startedAt": 1790863765,
+      "completedAt": 1790863826,
+      "durationMs": 60284
+    }
+  },
+  "observerCompletion": {
+    "threadId": "01a0f7cc-70e8-7850-abdc-65975ee39cad",
+    "turn": {
+      "id": "01a0f7cc-7112-7e93-afbb-46591e8f7ea8",
+      "items": [
+        {
+          "type": "agentMessage",
+          "id": "msg_0b381d465cef832e016abe69d144e887d0b507abec1ea2828d",
+          "text": "STEER-REAL-DONE-1790863775820182352",
+          "phase": "final_answer",
+          "memoryCitation": null,
+          "delivery": null,
+          "questions": null
+        }
+      ],
+      "itemsView": "summary",
+      "status": "completed",
+      "error": null,
+      "startedAt": 1790863765,
+      "completedAt": 1790863826,
+      "durationMs": 60284
+    }
+  },
+  "passed": true
+}

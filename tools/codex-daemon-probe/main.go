@@ -25,12 +25,16 @@ func run() error {
 	binary := flag.String("codex", "codex", "Codex CLI binary used for passive discovery")
 	watch := flag.String("watch", "", "explicit thread ID to resume and observe; approval replies require interactive mode")
 	findCwd := flag.String("find-cwd", "", "passively find loaded threads in an exact workspace directory")
-	selfTest := flag.Bool("self-test", false, "create a separate test thread using a local fake model; test two clients, approval, steer, reconnect and interrupt")
-	interactive := flag.Bool("interactive", false, "with watch: accept explicit pending/reply/detach JSON commands on stdin; never auto-approve")
+	selfTest := flag.Bool("self-test", false, "create a separate test thread using a local fake model; test two clients, approval decline/cancel, steer, reconnect and interrupt")
+	questionTest := flag.Bool("user-input-self-test", false, "create an isolated thread with a local fake model; test question replay, Other answers, external skip and resolution")
+	interactive := flag.Bool("interactive", false, "with watch: accept explicit approval/question JSON commands on stdin; never auto-reply")
 	duration := flag.Duration("timeout", 60*time.Second, "total probe deadline")
 	flag.Parse()
-	if *interactive && (*watch == "" || *selfTest || *findCwd != "") {
+	if *interactive && (*watch == "" || *selfTest || *questionTest || *findCwd != "") {
 		return fmt.Errorf("interactive requires only an explicit watch thread")
+	}
+	if *questionTest && (*selfTest || *watch != "" || *findCwd != "") {
+		return fmt.Errorf("user-input-self-test cannot be combined with other modes")
 	}
 	if *selfTest && *watch != "" {
 		return fmt.Errorf("choose self-test or watch")
@@ -52,6 +56,9 @@ func run() error {
 	}
 	if *selfTest {
 		return selfTestDaemon(ctx, info, enc)
+	}
+	if *questionTest {
+		return selfTestUserInput(ctx, info, enc)
 	}
 	c, err := connect(ctx, info.SocketPath)
 	if err != nil {
@@ -89,7 +96,11 @@ func run() error {
 		return err
 	}
 	if *interactive {
-		return watchInteractive(ctx, c, *watch, enc, os.Stdin)
+		var snapshot threadSnapshot
+		if err := json.Unmarshal(resumed, &snapshot); err != nil {
+			return fmt.Errorf("decode interactive resume: %w", err)
+		}
+		return watchInteractive(ctx, c, *watch, enc, os.Stdin, snapshot)
 	}
 	for {
 		m, err := c.next(ctx)

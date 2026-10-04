@@ -6,6 +6,17 @@
 
 换电脑继续请先读 [接续记录与验收清单](codex-managed-daemon-handoff.md)。
 
+2026-10-01 接续已补齐 probe 的一次性 cancel；审批决策无 other，问答 Other
+属于独立请求。真实 daemon 0.159.3 + 隔离 probe/模拟模型验证结果见
+[审批决策核对](codex-managed-daemon-approval.md)。下文保留 09-30 的原始版本和结果。
+随后补齐 probe 的问答选择/Other/skip 和跨客户端同步，见
+[问答接入验证](codex-managed-daemon-user-input.md)。
+interactive steer 新入口及失败路径也已通过真实 daemon/模拟模型验证，见
+[steer 验证](codex-managed-daemon-steer.md)。真实 CLI steer 行为仍待验收。
+随后已用 daemon 默认真实模型 gpt-6.1-sol/openai 通过双 probe steer 验收，
+进度和最终回复实际按新指示改变，原 thread/turn 和单次命令保持一致，见
+[真实模型结果](codex-managed-daemon-real-model-steer-result.json)。真人 CLI UI 未测。
+
 ## 结论与边界
 
 **Go：当前 daemon 支持独立客户端共享同一运行中 thread 的状态与控制。**
@@ -166,3 +177,9 @@ Go 缓存最初没有自动生效的原因：本机 `.bashrc` 在非交互 shell
 仓库现有的 `npm run build` 生成资源后，构建及全仓测试通过。前端源码和 lockfile
 没有变更。早期另一次并行全仓测试遇到原有 `TestCmdCronExec_TriggersJob/exec`
 临时目录清理竞态（directory not empty）；最终全仓检查通过，未修改该测试或 core。
+
+2026-10-01 后续真实模型验收：双 probe interrupt 和审批并发四种组合通过。
+interactive 已支持 interrupt，显式绑定 active turn；turn 中断与后台终端
+停止是不同操作。实测后台 Python 保留，单独 terminate 后停止。
+详见 [interrupt/竞争记录](codex-managed-daemon-interrupt-race.md)；
+尚未覆盖真人 CLI/Desktop UI 或 CC Connect/飞书入口。
