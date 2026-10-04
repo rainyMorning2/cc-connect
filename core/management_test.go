@@ -656,7 +656,17 @@ func TestMgmt_CronExecByID(t *testing.T) {
 	deadline = time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
 		if len(platform.getSent()) >= 4 {
-			return
+			// The visible reply precedes MarkRun's final store write. Wait
+			// for that write before TempDir cleanup removes the cron files.
+			store.mu.Lock()
+			completed := true
+			for _, stored := range store.jobs {
+				completed = completed && !stored.LastRun.IsZero()
+			}
+			store.mu.Unlock()
+			if completed {
+				return
+			}
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
