@@ -9914,7 +9914,7 @@ func (e *Engine) cmdHistory(p Platform, msg *Message, args []string) {
 
 	entries, historyErr := e.historyForSession(agent, s, n)
 	if historyErr != nil {
-		e.reply(p, msg.ReplyCtx, e.i18n.Tf(MsgError, historyErr))
+		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgHistoryReadFailed))
 		return
 	}
 
@@ -14212,7 +14212,7 @@ func (e *Engine) renderHistoryCard(sessionKey string) *Card {
 	s := sessions.GetOrCreateActive(sessionKey)
 	entries, historyErr := e.historyForSession(agent, s, 10)
 	if historyErr != nil {
-		return e.simpleCard(e.i18n.T(MsgCardTitleHistory), "turquoise", e.i18n.Tf(MsgError, historyErr))
+		return e.simpleCard(e.i18n.T(MsgCardTitleHistory), "turquoise", e.i18n.T(MsgHistoryReadFailed))
 	}
 
 	if len(entries) == 0 {
