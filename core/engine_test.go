@@ -6102,11 +6102,11 @@ func TestCmdUsage_Success(t *testing.T) {
 		"Account: dev@example.com (team)",
 		"5h limit",
 		"Remaining: 77%",
-		"Resets: 1h 51m",
+		"Resets: in 1h 51m",
 		"5h limit",
 		"7d limit",
 		"Remaining: 58%",
-		"Resets: 5d 22h 24m",
+		"Resets: in 5d 22h 24m",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("usage text = %q, want substring %q", got, want)
