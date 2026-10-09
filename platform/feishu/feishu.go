@@ -452,7 +452,7 @@ func newPlatform(name, domain string, opts map[string]any) (core.Platform, error
 		}
 		value = strings.ToLower(strings.TrimSpace(value))
 		if value != "fast" && value != "delay" {
-			return nil, fmt.Errorf("%s: print_strategy must be fast or delay", name)
+			return nil, fmt.Errorf("%s: print_strategy must be 'fast' or 'delay' (case-insensitive)", name)
 		}
 		streamingConfig["print_strategy"] = value
 	}
