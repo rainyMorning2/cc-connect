@@ -113,7 +113,7 @@ func (e *Engine) attachSharedSession(p Platform, msg *Message, agent Agent, sess
 	// currently selected conversation and its live observer.
 	e.cleanupInteractiveState(key)
 	session := sessions.SwitchToAgentSession(msg.SessionKey, info.ID, agent.Name(), info.Summary)
-	state := &interactiveState{agentSession: as, busySession: session, agent: agent, platform: p, replyCtx: msg.ReplyCtx, sharedSessionKey: msg.SessionKey, eventsNeedResync: false}
+	state := &interactiveState{agentSession: as, busySession: session, agent: agent, platform: p, replyCtx: msg.ReplyCtx, shared: sharedSessionState{sessionKey: msg.SessionKey}, eventsNeedResync: false}
 	e.interactiveMu.Lock()
 	e.interactiveStates[key] = state
 	e.interactiveMu.Unlock()
@@ -263,7 +263,7 @@ func (e *Engine) sharedSwitchCardAction(args, sessionKey string) *Card {
 		if err == nil {
 			err = fmt.Errorf("session has no reply platform")
 		}
-		slog.Warn("shared session card switch failed", "error", err)
+		slog.Warn("shared session card switch failed", "project", e.name, "session_key", sessionKey, "error", err)
 		return NewCard().Markdown(e.i18n.Tf(MsgError, err)).Build()
 	}
 	msg := &Message{SessionKey: sessionKey, Platform: target.platform.Name(), UserID: extractUserID(sessionKey), ReplyCtx: target.replyCtx}

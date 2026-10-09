@@ -1,5 +1,9 @@
 package core
 
+// Agent tool requests can identify an attached session instead of supplying
+// project/chat routing parameters. This file resolves that ID to a unique live
+// shared connection; it does not grant access or select a most-recent session.
+
 import (
 	"fmt"
 	"net/http"
@@ -41,7 +45,7 @@ func (s *APIServer) bindAgentToolRequest(project, sessionKey, agentSessionID str
 		engine.interactiveMu.Unlock()
 		for _, state := range states {
 			state.mu.Lock()
-			as, key, stopped := state.agentSession, state.sharedSessionKey, state.stopped
+			as, key, stopped := state.agentSession, state.shared.sessionKey, state.stopped
 			state.mu.Unlock()
 			shared, ok := as.(SharedAgentSession)
 			if !ok || stopped || key == "" || !shared.Alive() {

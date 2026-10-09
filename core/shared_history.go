@@ -17,7 +17,7 @@ func (e *Engine) historyForSession(agent Agent, session *Session, limit int) ([]
 	defer cancel()
 	history, err := provider.GetSessionHistory(ctx, id, limit)
 	if err != nil {
-		slog.Warn("read agent session history", "session_id", id, "error", err)
+		slog.Warn("read agent session history", "project", e.name, "agent_session_id", id, "error", err)
 		return nil, err
 	}
 	return history, nil
