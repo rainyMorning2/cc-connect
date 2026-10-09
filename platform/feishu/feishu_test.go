@@ -2492,6 +2492,11 @@ func TestStreamingConfigValidation(t *testing.T) {
 		if err != nil && !strings.Contains(err.Error(), tc.key) {
 			t.Fatalf("missing field in error: %v", err)
 		}
+		if _, isString := tc.value.(string); tc.key == "print_strategy" && isString && !tc.valid {
+			if !strings.Contains(err.Error(), "must be 'fast' or 'delay' (case-insensitive)") {
+				t.Fatalf("missing accepted values or case-insensitive guidance: %v", err)
+			}
+		}
 	}
 }
 
