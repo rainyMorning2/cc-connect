@@ -246,6 +246,64 @@ Available tags: `no_acp`, `no_claudecode`, `no_codex`, `no_copilot`, `no_cursor`
 `no_discord`, `no_slack`, `no_dingtalk`, `no_wecom`, `no_weixin`, `no_qq`, `no_qqbot`,
 `no_line`, `no_weibo`, `no_tuitui`.
 
+## 本地打包与运行入口（local 分支）
+
+本机本地实验的打包产物统一放在 `/home/daizhen/.local/share/cc-connect/builds`，
+按版本和提交保存独立二进制。命名格式为：
+
+```text
+cc-connect-<基础版本>-local-<8 位 commit ID>
+```
+
+已有产物示例：`cc-connect-v1.5.1-beta.1-local-0383316d`、
+`cc-connect-v1.5.1-beta.2-local-0562d48c`。基础版本按本次指定的版本选择，
+未指定时使用 Makefile 的 `VERSION`；不要仅根据已有文件自动递增版本。
+构建时传入的 `VERSION` 为 `<基础版本>-local-<8 位 commit ID>`，确保
+`--version` 第一行也包含提交号；`COMMIT` 使用同一个实际构建提交号，
+产物文件名为 `cc-connect-${VERSION}`。不要覆盖已有产物；有未提交源码修改时先说明，避免把不同源码
+打包成同一版本、同一提交号的文件。
+
+在仓库根目录执行的打包示例（版本按本次需求替换）：
+
+```bash
+local_base_version='v1.5.1-beta.3'
+local_build_commit=$(git rev-parse --short=8 HEAD)
+local_build_version="${local_base_version}-local-${local_build_commit}"
+local_build_dir='/home/daizhen/.local/share/cc-connect/builds'
+local_build_binary="${local_build_dir}/cc-connect-${local_build_version}"
+
+mkdir -p "$local_build_dir"
+test ! -e "$local_build_binary" && make build \
+  VERSION="$local_build_version" COMMIT="$local_build_commit" APP="$local_build_binary"
+"$local_build_binary" --version
+```
+
+构建完成后确认 `--version` 的版本和提交号，并报告产物完整路径。
+该目录在工作区之外，需要遵守当前环境的写入权限要求。
+
+### cc-connect-local 软链接
+
+`/home/daizhen/.local/bin/cc-connect-local` 是本地运行入口，指向上述 builds
+目录中某一个明确选择的二进制。调用 `cc-connect-local` 会执行它当前指向的版本；
+新产物放入 builds 目录不会自动启用。
+
+- **打包后不要主动创建、更新或重定向这个软链接。** “打包”“构建”请求不代表授权切换运行版本。
+- 每次交付打包产物时，都要读取并报告当前软链接目标，并提供切换到新产物的命令，提醒用户该操作尚未执行。
+- **只有用户明确要求更新软链接后才执行修改。** 如未明确目标版本且有多个候选产物，先确认要启用哪个产物。
+- 更新时使用产物的绝对路径，并保留旧二进制，便于按相同方式切回旧版本。
+- 更新后用 `readlink -f` 和入口的 `--version` 验证目标、版本及提交号。
+
+仅在用户明确授权后执行的切换示例：
+
+```bash
+ln -sfn -- "$local_build_binary" /home/daizhen/.local/bin/cc-connect-local
+readlink -f /home/daizhen/.local/bin/cc-connect-local
+/home/daizhen/.local/bin/cc-connect-local --version
+```
+
+其中 `local_build_binary` 必须是本次明确选择且已验证的产物路径；后续会话或新终端中
+应重新设置这个变量，不能假定此前打包时的 shell 变量仍然存在。
+
 ## Pre-Commit Checklist
 
 1. **Build passes**: `go build ./...`
