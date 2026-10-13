@@ -12709,7 +12709,7 @@ func (e *Engine) renderCardForPlatformWorkspace(p Platform, card *Card, workspac
 	if card == nil {
 		return nil
 	}
-	out := &Card{}
+	out := &Card{RichMarkdown: card.RichMarkdown}
 	if card.Header != nil {
 		h := *card.Header
 		out.Header = &h
@@ -12722,7 +12722,7 @@ func (e *Engine) renderCardForPlatformWorkspace(p Platform, card *Card, workspac
 			if workspaceDir != "" {
 				content = e.renderOutgoingContentForWorkspace(p, v.Content, workspaceDir)
 			}
-			out.Elements = append(out.Elements, CardMarkdown{Content: content})
+			out.Elements = append(out.Elements, CardMarkdown{Content: content, Diff: v.Diff})
 		case CardNote:
 			text := v.Text
 			if workspaceDir != "" {
