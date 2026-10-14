@@ -256,17 +256,24 @@ cc-connect-<基础版本>-local-<8 位 commit ID>
 ```
 
 已有产物示例：`cc-connect-v1.5.1-beta.1-local-0383316d`、
-`cc-connect-v1.5.1-beta.2-local-0562d48c`。基础版本按本次指定的版本选择，
-未指定时使用 Makefile 的 `VERSION`；不要仅根据已有文件自动递增版本。
+`cc-connect-v1.5.1-beta.2-local-0562d48c`。用户明确指定完整版本时按指定值打包；
+未指定时，以 Makefile 的 `VERSION` 确定版本系列（例如 `v1.5.1`），
+扫描 builds 目录中同系列的 `beta.N` 本地产物，使用最大 `N + 1`。
+没有同系列产物时，使用 Makefile 的 `VERSION` 作为首次版本。
+**每次新的本地 beta 打包都要递增 beta 序号，不要因为 Makefile 仍是 beta.1
+就反复生成 beta.1。** 例如已有 `v1.5.1-beta.4-local-...`，下一次为
+`v1.5.1-beta.5-local-<本次提交号>`；只递增 beta 序号，不擅自改变主、次、修订版本。
+非 beta 版本没有可递增序号时，按用户指定值或 Makefile 的 `VERSION` 使用。
 构建时传入的 `VERSION` 为 `<基础版本>-local-<8 位 commit ID>`，确保
 `--version` 第一行也包含提交号；`COMMIT` 使用同一个实际构建提交号，
 产物文件名为 `cc-connect-${VERSION}`。不要覆盖已有产物；有未提交源码修改时先说明，避免把不同源码
-打包成同一版本、同一提交号的文件。
+打包成同一版本、同一提交号的文件。源码修复和打包说明的修改应先提交，
+再使用最后的实际提交号打包，避免产物不包含说明中描述的改动。
 
-在仓库根目录执行的打包示例（版本按本次需求替换）：
+在仓库根目录执行的打包示例（先扫描同系列产物；示例假定最大 beta 序号为 4）：
 
 ```bash
-local_base_version='v1.5.1-beta.3'
+local_base_version='v1.5.1-beta.5'
 local_build_commit=$(git rev-parse --short=8 HEAD)
 local_build_version="${local_base_version}-local-${local_build_commit}"
 local_build_dir='/home/daizhen/.local/share/cc-connect/builds'
