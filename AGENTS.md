@@ -311,6 +311,17 @@ readlink -f /home/daizhen/.local/bin/cc-connect-local
 其中 `local_build_binary` 必须是本次明确选择且已验证的产物路径；后续会话或新终端中
 应重新设置这个变量，不能假定此前打包时的 shell 变量仍然存在。
 
+### 重启本地服务
+
+切换软链接后，用户明确要求重启时，统一使用本地入口：
+
+```bash
+cc-connect-local daemon restart
+cc-connect-local daemon status
+```
+
+重启后确认服务处于运行状态，并核对进程实际使用的二进制为本次选定的产物。
+
 ## Pre-Commit Checklist
 
 1. **Build passes**: `go build ./...`
