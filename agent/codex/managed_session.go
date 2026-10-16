@@ -45,6 +45,7 @@ type managedSnapshot struct {
 	} `json:"activePermissionProfile"`
 	Sandbox         json.RawMessage `json:"sandbox"`
 	ReasoningEffort *string         `json:"reasoningEffort"`
+	ServiceTier     *string         `json:"serviceTier"`
 }
 type managedRequest struct {
 	rawID          json.RawMessage
@@ -141,6 +142,9 @@ func (a *managedAgent) newThreadParams() map[string]any {
 			params["modelProvider"] = name
 		}
 	}
+	if a.serviceTier != "" {
+		params["serviceTier"] = a.serviceTier
+	}
 	if a.reasoningEffort != "" {
 		params["config"] = map[string]any{"model_reasoning_effort": a.reasoningEffort}
 	}
@@ -195,6 +199,7 @@ func (s *managedSession) applySnapshot(snapshot managedSnapshot, expected string
 		s.decoder.workDir = cwd
 	}
 	s.decoder.model = snapshot.Model
+	s.decoder.serviceTier = stringValue(snapshot.ServiceTier)
 	s.decoder.effort = ""
 	if snapshot.ReasoningEffort != nil {
 		s.decoder.effort = *snapshot.ReasoningEffort
@@ -360,6 +365,7 @@ func (s *managedSession) ReadRuntimeSettings(ctx context.Context) (core.AgentRun
 	s.decoder.runtimeMu.Lock()
 	s.decoder.model = settings.Model
 	s.decoder.effort = settings.ReasoningEffort
+	s.decoder.serviceTier = stringValue(snapshot.ServiceTier)
 	s.decoder.runtimeMu.Unlock()
 	return settings, nil
 }

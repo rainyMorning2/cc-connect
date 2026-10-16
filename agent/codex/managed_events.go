@@ -34,9 +34,10 @@ func (s *managedSession) handleMessage(m daemonMessage) error {
 	case "thread/settings/updated":
 		var p struct {
 			ThreadSettings struct {
-				Model  string `json:"model"`
-				Effort string `json:"effort"`
-				Cwd    string `json:"cwd"`
+				Model       string  `json:"model"`
+				Effort      string  `json:"effort"`
+				Cwd         string  `json:"cwd"`
+				ServiceTier *string `json:"serviceTier"`
 			} `json:"threadSettings"`
 		}
 		if err := json.Unmarshal(m.Params, &p); err != nil {
@@ -51,6 +52,7 @@ func (s *managedSession) handleMessage(m daemonMessage) error {
 		s.decoder.runtimeMu.Lock()
 		s.decoder.model = p.ThreadSettings.Model
 		s.decoder.effort = p.ThreadSettings.Effort
+		s.decoder.serviceTier = stringValue(p.ThreadSettings.ServiceTier)
 		s.decoder.runtimeMu.Unlock()
 	case "turn/started":
 		var p turnNotification

@@ -451,6 +451,19 @@ type ReasoningEffortSwitcher interface {
 	AvailableReasoningEfforts() []string
 }
 
+// ServiceTierReporter exposes the current tier, including an empty/default tier.
+// A session's value takes precedence over agent creation defaults.
+type ServiceTierReporter interface {
+	GetServiceTier() string
+}
+
+// ServiceTierSwitcher changes the tier for subsequent turns without replacing
+// the conversation. Implementations must report server rejections to the caller.
+type ServiceTierSwitcher interface {
+	ServiceTierReporter
+	SetServiceTier(context.Context, string) error
+}
+
 // ModelOption describes a selectable model.
 type ModelOption struct {
 	Name  string // model identifier passed to CLI

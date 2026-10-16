@@ -44,6 +44,101 @@ import (
 	"time"
 )
 
+// Turn Fast on, chat, turn it off, chat again, then read history. The user
+// sees the actual tier in each reply without losing the existing conversation.
+func TestCUJ_A9_FastTogglePreservesConversationAndFooter(t *testing.T) {
+	env := newCUJEnv(t)
+	a := &fastTestAgent{}
+	env.engine.agent = a
+	env.engine.SetReplyFooterEnabled(true)
+	env.engine.SetShowContextIndicator(true)
+	defer env.engine.Stop()
+	env.userSends("user", "/fast on")
+	if !strings.Contains(strings.Join(env.plat.getSent(), "\n"), env.engine.i18n.T(MsgFastOn)) {
+		t.Fatal("Fast on not visible")
+	}
+	env.userSends("user", "first message")
+	env.waitFor("Fast footer", 3*time.Second, func() bool {
+		return strings.Contains(strings.Join(env.plat.getSent(), "\n"), "test-model · high · fast")
+	})
+	env.userSends("user", "/fast off")
+	env.userSends("user", "second message")
+	env.waitFor("second reply", 3*time.Second, func() bool {
+		count := 0
+		for _, text := range env.plat.getSent() {
+			if strings.Contains(text, "test-model · high") {
+				count++
+			}
+		}
+		return count >= 2
+	})
+	sent := env.plat.getSent()
+	for i := len(sent) - 1; i >= 0; i-- {
+		if strings.Contains(sent[i], "test-model · high") {
+			if strings.Contains(sent[i], " · fast") {
+				t.Fatalf("Fast off still displayed: %q", sent[i])
+			}
+			break
+		}
+	}
+	env.userSends("user", "/history")
+	visible := strings.Join(env.plat.getSent(), "\n")
+	if !strings.Contains(visible, "first message") || !strings.Contains(visible, "second message") {
+		t.Fatalf("history was lost: %s", visible)
+	}
+}
+
+type quotaCUJAgent struct{ cujAgent }
+
+func (*quotaCUJAgent) GetModel() string { return "quota-model" }
+func (*quotaCUJAgent) GetUsage(context.Context) (*UsageReport, error) {
+	return footerQuotaReport(), nil
+}
+
+// Chat, hide the 5h segment, chat, then disable the entire footer and chat.
+// Quota toggles affect only the user-visible footer, preserving history.
+func TestCUJ_A10_FooterQuotaToggles(t *testing.T) {
+	env := newCUJEnv(t)
+	env.engine.agent = &quotaCUJAgent{}
+	env.engine.SetReplyFooterEnabled(true)
+	env.engine.SetShowUsage5h(true)
+	env.engine.SetShowUsageWeek(true)
+	defer env.engine.Stop()
+	chat := func(prompt, want string) string {
+		env.t.Helper()
+		before := len(env.plat.getSent())
+		env.userSends("user", prompt)
+		env.waitFor("quota reply", 3*time.Second, func() bool {
+			for _, text := range env.plat.getSent()[before:] {
+				if strings.Contains(text, want) {
+					return true
+				}
+			}
+			return false
+		})
+		sent := env.plat.getSent()
+		return sent[len(sent)-1]
+	}
+	if text := chat("first quota message", "5h 77% left"); !strings.Contains(text, "week 33% left") {
+		t.Fatalf("weekly quota missing: %s", text)
+	}
+	env.engine.SetShowUsage5h(false)
+	if text := chat("second quota message", "week 33% left"); strings.Contains(text, "5h") {
+		t.Fatalf("disabled 5h still shown: %s", text)
+	}
+	env.engine.SetReplyFooterEnabled(false)
+	if text := chat("third quota message", "ok"); strings.Contains(text, "% left") || strings.Contains(text, "quota-model") {
+		t.Fatalf("disabled footer still shown: %s", text)
+	}
+	env.userSends("user", "/history")
+	visible := strings.Join(env.plat.getSent(), "\n")
+	for _, prompt := range []string{"first quota message", "second quota message", "third quota message"} {
+		if !strings.Contains(visible, prompt) {
+			t.Fatalf("history lost %q", prompt)
+		}
+	}
+}
+
 // CUJ: submit work during slow startup, queue a follow-up while the agent is
 // working, then check status. Both messages have receipts before either answer;
 // draining the queue must preserve each receipt without adding another one.

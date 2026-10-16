@@ -296,7 +296,7 @@ func TestCodexPromptPreamble_EmptyIsNoop(t *testing.T) {
 	}
 }
 
-func TestGetModelAndReasoningEffort_FromRuntimeConfigWhenUnset(t *testing.T) {
+func TestGetModelReasoningEffortAndFast_FromRuntimeConfigWhenUnset(t *testing.T) {
 	workDir := t.TempDir()
 	binDir := filepath.Join(workDir, "bin")
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
@@ -316,7 +316,7 @@ while IFS= read -r line; do
       printf '{"id":%s,"result":{"protocolVersion":"2"}}\n' "$id"
       ;;
     *'"method":"config/read"'*)
-      printf '{"id":%s,"result":{"config":{"model":"gpt-5.4","model_reasoning_effort":"xhigh"},"origins":{}}}\n' "$id"
+      printf '{"id":%s,"result":{"config":{"model":"gpt-5.4","model_reasoning_effort":"xhigh","service_tier":"priority"},"origins":{}}}\n' "$id"
       ;;
   esac
 done
@@ -326,7 +326,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
   if ($line -like '*"method":"initialize"*') {
     [Console]::Out.WriteLine('{"id":1,"result":{"protocolVersion":"2"}}')
   } elseif ($line -like '*"method":"config/read"*') {
-    [Console]::Out.WriteLine('{"id":2,"result":{"config":{"model":"gpt-5.4","model_reasoning_effort":"xhigh"},"origins":{}}}')
+    [Console]::Out.WriteLine('{"id":2,"result":{"config":{"model":"gpt-5.4","model_reasoning_effort":"xhigh","service_tier":"priority"},"origins":{}}}')
   }
 }
 `
@@ -345,6 +345,9 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
 	}
 	if got := cs.GetReasoningEffort(); got != "xhigh" {
 		t.Fatalf("GetReasoningEffort() = %q, want xhigh", got)
+	}
+	if got := cs.GetServiceTier(); got != "priority" {
+		t.Fatalf("GetServiceTier() = %q, want priority", got)
 	}
 }
 

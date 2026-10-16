@@ -50,6 +50,8 @@ type codexSession struct {
 	runtimeCfgMu       sync.Mutex
 	runtimeCfgModel    string
 	runtimeCfgEffort   string
+	runtimeCfgTier     string
+	serviceTier        string
 	runtimeCfgFetched  time.Time
 	runtimeCfgFetchErr error
 
@@ -279,6 +281,12 @@ func (cs *codexSession) buildExecArgs(prompt string, imagePaths []string) []stri
 	if cs.effort != "" {
 		args = append(args, "-c", fmt.Sprintf("model_reasoning_effort=%q", cs.effort))
 	}
+
+	cs.runtimeCfgMu.Lock()
+	if cs.serviceTier != "" {
+		args = append(args, "-c", fmt.Sprintf("service_tier=%q", cs.serviceTier))
+	}
+	cs.runtimeCfgMu.Unlock()
 
 	if isResume {
 		args = append(args, tid)
@@ -677,10 +685,10 @@ func codexToolSuccess(status string, exitCode *int) bool {
 	return s == "completed" || s == "success" || s == "succeeded" || s == "ok"
 }
 
-func loadCodexRuntimeConfig(ctx context.Context, cliBin string, cliExtraArgs []string, workDir string, extraEnv []string) (string, string, error) {
+func loadCodexRuntimeConfig(ctx context.Context, cliBin string, cliExtraArgs []string, workDir string, extraEnv []string) (string, string, string, error) {
 	bin, err := resolveCodexExecutable(cliBin)
 	if err != nil {
-		return "", "", fmt.Errorf("runtime config resolve CLI: %w", err)
+		return "", "", "", fmt.Errorf("runtime config resolve CLI: %w", err)
 	}
 	args := append(append([]string(nil), cliExtraArgs...), "app-server")
 	cmd := exec.CommandContext(ctx, bin, args...)
@@ -692,17 +700,17 @@ func loadCodexRuntimeConfig(ctx context.Context, cliBin string, cliExtraArgs []s
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return "", "", fmt.Errorf("runtime config stdin pipe: %w", err)
+		return "", "", "", fmt.Errorf("runtime config stdin pipe: %w", err)
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return "", "", fmt.Errorf("runtime config stdout pipe: %w", err)
+		return "", "", "", fmt.Errorf("runtime config stdout pipe: %w", err)
 	}
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
 	if err := cmd.Start(); err != nil {
-		return "", "", fmt.Errorf("runtime config start app-server: %w", err)
+		return "", "", "", fmt.Errorf("runtime config start app-server: %w", err)
 	}
 	defer func() {
 		_ = stdin.Close()
@@ -722,16 +730,17 @@ func loadCodexRuntimeConfig(ctx context.Context, cliBin string, cliExtraArgs []s
 			"version": "0.1.0",
 		},
 	}, nil); err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	nextID++
 
 	if err := rpcNotifyOverIO(stdin, "initialized", map[string]any{}); err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	var resp struct {
 		Config struct {
+			ServiceTier          string  `json:"service_tier"`
 			Model                string  `json:"model"`
 			ModelReasoningEffort *string `json:"model_reasoning_effort"`
 		} `json:"config"`
@@ -739,10 +748,10 @@ func loadCodexRuntimeConfig(ctx context.Context, cliBin string, cliExtraArgs []s
 	if err := rpcRequestOverIO(stdin, reader, nextID, "config/read", map[string]any{
 		"includeLayers": false,
 	}, &resp); err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
-	return strings.TrimSpace(resp.Config.Model), normalizeRuntimeReasoningEffort(stringValue(resp.Config.ModelReasoningEffort)), nil
+	return strings.TrimSpace(resp.Config.Model), normalizeRuntimeReasoningEffort(stringValue(resp.Config.ModelReasoningEffort)), strings.TrimSpace(resp.Config.ServiceTier), nil
 }
 
 func rpcRequestOverIO(stdin io.Writer, reader *bufio.Reader, id int64, method string, params any, out any) error {
@@ -865,10 +874,11 @@ func (cs *codexSession) runtimeConfig() (string, string) {
 	ctx, cancel := context.WithTimeout(cs.ctx, codexRuntimeConfigTimeout)
 	defer cancel()
 
-	model, effort, err := loadCodexRuntimeConfig(ctx, cs.cmd, cs.cliExtraArgs, cs.workDir, cs.extraEnv)
+	model, effort, tier, err := loadCodexRuntimeConfig(ctx, cs.cmd, cs.cliExtraArgs, cs.workDir, cs.extraEnv)
 	if err == nil {
 		cs.runtimeCfgModel = model
 		cs.runtimeCfgEffort = effort
+		cs.runtimeCfgTier = tier
 		cs.runtimeCfgFetchErr = nil
 		cs.runtimeCfgFetched = time.Now()
 		return model, effort

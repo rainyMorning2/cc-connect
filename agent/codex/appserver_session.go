@@ -44,6 +44,7 @@ type threadStartResponse struct {
 	Cwd             string  `json:"cwd"`
 	Model           string  `json:"model"`
 	ReasoningEffort *string `json:"reasoningEffort"`
+	ServiceTier     *string `json:"serviceTier"`
 	Thread          struct {
 		ID string `json:"id"`
 	} `json:"thread"`
@@ -53,6 +54,7 @@ type threadResumeResponse struct {
 	Cwd             string  `json:"cwd"`
 	Model           string  `json:"model"`
 	ReasoningEffort *string `json:"reasoningEffort"`
+	ServiceTier     *string `json:"serviceTier"`
 	Thread          struct {
 		ID string `json:"id"`
 	} `json:"thread"`
@@ -150,12 +152,14 @@ type appServerRequestUserInputAnswer struct {
 }
 
 type appServerSession struct {
+	opMu           sync.Mutex // serializes sends and explicit runtime setting changes
 	cliBin         string
 	cliExtraArgs   []string
 	url            string
 	workDir        string
 	model          string
 	effort         string
+	serviceTier    string
 	mode           string
 	baseURL        string
 	modelProvider  string
@@ -202,7 +206,7 @@ const (
 	appServerUsageRefreshTimeout = 1500 * time.Millisecond
 )
 
-func newAppServerSession(ctx context.Context, cliBin string, cliExtraArgs []string, url, workDir, model, effort, mode, resumeID, baseURL, modelProvider string, extraEnv []string, codexHome string, systemPrompt string, appendPrompt string) (*appServerSession, error) {
+func newAppServerSession(ctx context.Context, cliBin string, cliExtraArgs []string, url, workDir, model, effort, mode, resumeID, baseURL, modelProvider string, extraEnv []string, codexHome string, systemPrompt string, appendPrompt string, serviceTier string) (*appServerSession, error) {
 	sessionCtx, cancel := context.WithCancel(ctx)
 	s := &appServerSession{
 		cliBin:           cliBin,
@@ -224,6 +228,7 @@ func newAppServerSession(ctx context.Context, cliBin string, cliExtraArgs []stri
 		pendingApprovals: make(map[string]chan core.PermissionResult),
 		preambleSent:     resumeID != "" && resumeID != core.ContinueSession,
 	}
+	s.serviceTier = serviceTier
 	s.alive.Store(true)
 
 	if err := s.connect(); err != nil {
@@ -374,6 +379,7 @@ func (s *appServerSession) ensureThread(resumeID string) error {
 			return fmt.Errorf("codex app-server resume returned empty thread id")
 		}
 		s.applyThreadRuntimeState(resp.Cwd, resp.Model, resp.ReasoningEffort)
+		s.storeServiceTier(stringValue(resp.ServiceTier))
 		s.threadID.Store(resp.Thread.ID)
 		slog.Info("codex app-server thread resumed", "thread_id", resp.Thread.ID)
 		return nil
@@ -387,6 +393,7 @@ func (s *appServerSession) ensureThread(resumeID string) error {
 		return fmt.Errorf("codex app-server start returned empty thread id")
 	}
 	s.applyThreadRuntimeState(resp.Cwd, resp.Model, resp.ReasoningEffort)
+	s.storeServiceTier(stringValue(resp.ServiceTier))
 	s.threadID.Store(resp.Thread.ID)
 	slog.Info("codex app-server thread started", "thread_id", resp.Thread.ID)
 	return nil
@@ -399,6 +406,9 @@ func (s *appServerSession) threadRequestParams() map[string]any {
 	}
 	if model := s.GetModel(); model != "" {
 		params["model"] = model
+	}
+	if tier := s.GetServiceTier(); tier != "" {
+		params["serviceTier"] = tier
 	}
 	if approval, sandbox := appServerModeSettings(s.mode); approval != "" {
 		params["approvalPolicy"] = approval
@@ -481,6 +491,8 @@ func (s *appServerSession) storeContextUsage(usage *core.ContextUsage) {
 }
 
 func (s *appServerSession) Send(prompt string, messageID string, images []core.ImageAttachment, files []core.FileAttachment) error {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
 	if !s.alive.Load() {
 		return fmt.Errorf("session is closed")
 	}
@@ -529,6 +541,9 @@ func (s *appServerSession) Send(prompt string, messageID string, images []core.I
 	}
 	if effort := s.GetReasoningEffort(); effort != "" {
 		params["effort"] = effort
+	}
+	if tier := s.GetServiceTier(); tier != "" {
+		params["serviceTier"] = tier
 	}
 	if approval, _ := appServerModeSettings(s.mode); approval != "" {
 		params["approvalPolicy"] = approval
@@ -1140,6 +1155,8 @@ func (s *appServerSession) handleResponse(resp rpcResponseEnvelope) {
 
 func (s *appServerSession) handleNotification(method string, paramsRaw json.RawMessage) {
 	switch method {
+	case "thread/settings/updated":
+		s.handleSettingsUpdated(paramsRaw)
 	case "turn/started":
 		var notif turnNotification
 		if err := json.Unmarshal(paramsRaw, &notif); err == nil {

@@ -726,7 +726,74 @@ const (
 	MsgAgentRelayToolPrompt MsgKey = "agent_relay_tool_prompt"
 )
 
+const (
+	MsgFastDefaults     MsgKey = "fast_defaults"
+	MsgFastInherit      MsgKey = "fast_inherit"
+	MsgFastUsage        MsgKey = "fast_usage"
+	MsgFastOn           MsgKey = "fast_on"
+	MsgFastOff          MsgKey = "fast_off"
+	MsgFastNotSupported MsgKey = "fast_not_supported"
+)
+
+const MsgReplyFooterQuotaLeft MsgKey = "reply_footer_quota_left"
+
 var messages = map[MsgKey]map[Language]string{
+	MsgReplyFooterQuotaLeft: {
+		LangEnglish:            "%s %d%% left",
+		LangChinese:            "%s %d%% left",
+		LangTraditionalChinese: "%s %d%% left",
+		LangJapanese:           "%s %d%% left",
+		LangSpanish:            "%s %d%% left",
+	},
+	MsgFastDefaults: {
+		LangEnglish:            "New-session default: %s",
+		LangChinese:            "新会话默认设置：%s",
+		LangTraditionalChinese: "新會話預設設定：%s",
+		LangJapanese:           "新しいセッションの既定値: %s",
+		LangSpanish:            "Valor predeterminado de nuevas sesiones: %s",
+	},
+	MsgFastInherit: {
+		LangEnglish:            "Fast: inherit Codex settings.",
+		LangChinese:            "Fast：继承 Codex 设置。",
+		LangTraditionalChinese: "Fast：繼承 Codex 設定。",
+		LangJapanese:           "Fast: Codex の設定を継承。",
+		LangSpanish:            "Fast: heredar la configuración de Codex.",
+	},
+	MsgFastUsage: {
+		LangEnglish:            "Usage: /fast [on|off|status]. /fast toggles Fast mode.",
+		LangChinese:            "用法：/fast [on|off|status]。单独发送 /fast 切换 Fast 模式。",
+		LangTraditionalChinese: "用法：/fast [on|off|status]。單獨傳送 /fast 切換 Fast 模式。",
+		LangJapanese:           "使い方: /fast [on|off|status]。/fast で Fast モードを切り替えます。",
+		LangSpanish:            "Uso: /fast [on|off|status]. /fast alterna el modo Fast.",
+	},
+	MsgFastOn: {
+		LangEnglish:            "Fast: on (subsequent turns).",
+		LangChinese:            "Fast：已开启（后续轮次生效）。",
+		LangTraditionalChinese: "Fast：已開啟（後續輪次生效）。",
+		LangJapanese:           "Fast: オン（次のターンから有効）。",
+		LangSpanish:            "Fast: activado (siguientes turnos).",
+	},
+	MsgFastOff: {
+		LangEnglish:            "Fast: off (subsequent turns).",
+		LangChinese:            "Fast：已关闭（后续轮次生效）。",
+		LangTraditionalChinese: "Fast：已關閉（後續輪次生效）。",
+		LangJapanese:           "Fast: オフ（次のターンから有効）。",
+		LangSpanish:            "Fast: desactivado (siguientes turnos).",
+	},
+	MsgFastNotSupported: {
+		LangEnglish:            "This agent or session does not support Fast mode.",
+		LangChinese:            "当前 Agent 或会话不支持 Fast 模式。",
+		LangTraditionalChinese: "當前 Agent 或會話不支援 Fast 模式。",
+		LangJapanese:           "このエージェントまたはセッションは Fast モードに対応していません。",
+		LangSpanish:            "Este agente o sesión no admite el modo Fast.",
+	},
+	MsgKey("fast"): {
+		LangEnglish:            "Toggle Fast mode: /fast [on|off|status]",
+		LangChinese:            "切换 Fast 模式：/fast [on|off|status]",
+		LangTraditionalChinese: "切換 Fast 模式：/fast [on|off|status]",
+		LangJapanese:           "Fast モード: /fast [on|off|status]",
+		LangSpanish:            "Modo Fast: /fast [on|off|status]",
+	},
 	MsgApprovalDetails: {
 		LangEnglish:            "%s · Approval details",
 		LangChinese:            "%s · 审批详情",
@@ -1629,6 +1696,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/allow <tool>\n  Pre-allow a tool (next session)\n\n" +
 			"/model [switch <name>]\n  View/switch model\n\n" +
 			"/reasoning [level]\n  View/switch reasoning effort\n\n" +
+			"/fast [on|off|status]\n  Toggle/query Fast mode\n\n" +
 			"/mode [name]\n  View/switch permission mode\n\n" +
 			"/lang [en|zh|zh-TW|ja|es|auto]\n  View/switch language\n\n" +
 			"/compress\n  Compress conversation context\n\n" +
@@ -1673,6 +1741,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/allow <工具名>\n  预授权工具（下次会话生效）\n\n" +
 			"/model [switch <名称>]\n  查看/切换模型\n\n" +
 			"/reasoning [级别]\n  查看/切换推理强度\n\n" +
+			"/fast [on|off|status]\n  切换/查询 Fast 模式\n\n" +
 			"/mode [名称]\n  查看/切换权限模式\n\n" +
 			"/lang [en|zh|zh-TW|ja|es|auto]\n  查看/切换语言\n\n" +
 			"/compress\n  压缩会话上下文\n\n" +
@@ -1717,6 +1786,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/allow <工具名>\n  預授權工具（下次會話生效）\n\n" +
 			"/model [switch <名稱>]\n  查看/切換模型\n\n" +
 			"/reasoning [級別]\n  查看/切換推理強度\n\n" +
+			"/fast [on|off|status]\n  切換/查詢 Fast 模式\n\n" +
 			"/mode [名稱]\n  查看/切換權限模式\n\n" +
 			"/lang [en|zh|zh-TW|ja|es|auto]\n  查看/切換語言\n\n" +
 			"/compress\n  壓縮會話上下文\n\n" +
@@ -1759,6 +1829,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/allow <ツール名>\n  ツールを事前許可（次のセッションで有効）\n\n" +
 			"/model [switch <名前>]\n  モデルの表示/切り替え\n\n" +
 			"/reasoning [レベル]\n  推論レベルの表示/切り替え\n\n" +
+			"/fast [on|off|status]\n  Fast モードの切り替え・確認\n\n" +
 			"/mode [名前]\n  権限モードの表示/切り替え\n\n" +
 			"/lang [en|zh|zh-TW|ja|es|auto]\n  言語の表示/切り替え\n\n" +
 			"/compress\n  会話コンテキストを圧縮\n\n" +
@@ -1801,6 +1872,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/allow <herramienta>\n  Pre-autorizar herramienta (próxima sesión)\n\n" +
 			"/model [switch <nombre>]\n  Ver/cambiar modelo\n\n" +
 			"/reasoning [nivel]\n  Ver/cambiar nivel de razonamiento\n\n" +
+			"/fast [on|off|status]\n  Alternar/consultar el modo Fast\n\n" +
 			"/mode [nombre]\n  Ver/cambiar modo de permisos\n\n" +
 			"/lang [en|zh|zh-TW|ja|es|auto]\n  Ver/cambiar idioma\n\n" +
 			"/compress\n  Comprimir contexto de conversación\n\n" +
@@ -1888,6 +1960,7 @@ var messages = map[MsgKey]map[Language]string{
 	MsgHelpAgentSection: {
 		LangEnglish: "**Agent Configuration**\n" +
 			"/model [switch <name>] — View/switch model\n" +
+			"/fast [on|off|status] — Toggle/query Fast mode\n" +
 			"/mode [name] — View/switch permission mode\n" +
 			"/provider [list|add|...] — Manage API providers\n" +
 			"/memory [add|global|...] — View/edit memory files\n" +
@@ -1895,6 +1968,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/lang [en|zh|...] — View/switch language",
 		LangChinese: "**Agent 配置**\n" +
 			"/model [switch <名称>] — 查看/切换模型\n" +
+			"/fast [on|off|status] — 切换/查询 Fast 模式\n" +
 			"/mode [名称] — 查看/切换权限模式\n" +
 			"/provider [list|add|...] — 管理 API Provider\n" +
 			"/memory [add|global|...] — 查看/编辑记忆文件\n" +
@@ -1902,6 +1976,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/lang [en|zh|...] — 查看/切换语言",
 		LangTraditionalChinese: "**Agent 配置**\n" +
 			"/model [switch <名稱>] — 查看/切換模型\n" +
+			"/fast [on|off|status] — 切換/查詢 Fast 模式\n" +
 			"/mode [名稱] — 查看/切換權限模式\n" +
 			"/provider [list|add|...] — 管理 API Provider\n" +
 			"/memory [add|global|...] — 查看/編輯記憶檔案\n" +
@@ -1909,6 +1984,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/lang [en|zh|...] — 查看/切換語言",
 		LangJapanese: "**エージェント設定**\n" +
 			"/model [switch <名前>] — モデルの表示/切り替え\n" +
+			"/fast [on|off|status] — Fast モードの切り替え・確認\n" +
 			"/mode [名前] — 権限モードの表示/切り替え\n" +
 			"/provider [list|add|...] — API プロバイダ管理\n" +
 			"/memory [add|global|...] — メモリの表示/編集\n" +
@@ -1916,6 +1992,7 @@ var messages = map[MsgKey]map[Language]string{
 			"/lang [en|zh|...] — 言語の表示/切り替え",
 		LangSpanish: "**Configuración del agente**\n" +
 			"/model [switch <nombre>] — Ver/cambiar modelo\n" +
+			"/fast [on|off|status] — Alternar/consultar el modo Fast\n" +
 			"/mode [nombre] — Ver/cambiar modo de permisos\n" +
 			"/provider [list|add|...] — Gestionar proveedores\n" +
 			"/memory [add|global|...] — Ver/editar memoria\n" +
@@ -2842,10 +2919,10 @@ var messages = map[MsgKey]map[Language]string{
 	},
 	MsgReplyFooterRemaining: {
 		LangEnglish:            "%d%% left",
-		LangChinese:            "剩余 %d%%",
-		LangTraditionalChinese: "剩餘 %d%%",
-		LangJapanese:           "残り %d%%",
-		LangSpanish:            "%d%% restante",
+		LangChinese:            "%d%% left",
+		LangTraditionalChinese: "%d%% left",
+		LangJapanese:           "%d%% left",
+		LangSpanish:            "%d%% left",
 	},
 	MsgModelCurrent: {
 		LangEnglish:            "Current model: %s",

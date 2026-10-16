@@ -46,7 +46,7 @@ func (s *managedSession) SetCurrentPermissionMode(ctx context.Context, mode stri
 		params["permissions"] = profiles[sandbox]
 		delete(params, "sandbox")
 	}
-	return s.updateCurrentPermissionParams(ctx, params)
+	return s.updateCurrentThreadParams(ctx, params)
 }
 
 func (s *managedSession) CurrentApprovalModes() []core.PermissionModeInfo {
@@ -67,10 +67,10 @@ func (s *managedSession) SetCurrentApprovalMode(ctx context.Context, mode string
 		return fmt.Errorf("codex managed unsupported approval mode %q", mode)
 	}
 	// Deliberately omit permissions and sandboxPolicy to preserve custom profiles.
-	return s.updateCurrentPermissionParams(ctx, map[string]any{"approvalPolicy": "on-request", "approvalsReviewer": reviewer})
+	return s.updateCurrentThreadParams(ctx, map[string]any{"approvalPolicy": "on-request", "approvalsReviewer": reviewer})
 }
 
-func (s *managedSession) updateCurrentPermissionParams(ctx context.Context, params map[string]any) error {
+func (s *managedSession) updateCurrentThreadParams(ctx context.Context, params map[string]any) error {
 	s.opMu.Lock()
 	defer s.opMu.Unlock()
 	s.mu.Lock()
@@ -78,14 +78,14 @@ func (s *managedSession) updateCurrentPermissionParams(ctx context.Context, para
 	params["threadId"] = s.thread
 	s.mu.Unlock()
 	if busy {
-		return fmt.Errorf("codex managed permissions require an idle thread: %w", core.ErrAgentTurnBusy)
+		return fmt.Errorf("codex managed settings require an idle thread: %w", core.ErrAgentTurnBusy)
 	}
 	rpc, err := s.connection()
 	if err != nil {
 		return err
 	}
 	if err := rpc.request(ctx, "thread/settings/update", params, nil); err != nil {
-		return fmt.Errorf("codex managed update current permissions: %w", err)
+		return fmt.Errorf("codex managed update current settings: %w", err)
 	}
 	return nil
 }

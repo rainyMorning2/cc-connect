@@ -36,6 +36,7 @@ type Agent struct {
 	workDir            string
 	model              string
 	reasoningEffort    string
+	serviceTier        string
 	mode               string // "suggest" | "auto-edit" | "full-auto" | "yolo"
 	backend            string // "exec" | "app_server"
 	appServerTransport string
@@ -59,6 +60,7 @@ func New(opts map[string]any) (core.Agent, error) {
 	}
 	model, _ := opts["model"].(string)
 	reasoningEffort, _ := opts["reasoning_effort"].(string)
+	serviceTier, _ := opts["service_tier"].(string)
 	mode, _ := opts["mode"].(string)
 	backend, _ := opts["backend"].(string)
 	appServerURL, _ := opts["app_server_url"].(string)
@@ -132,6 +134,7 @@ func New(opts map[string]any) (core.Agent, error) {
 		workDir:            workDir,
 		model:              model,
 		reasoningEffort:    normalizeReasoningEffort(reasoningEffort),
+		serviceTier:        strings.TrimSpace(serviceTier),
 		mode:               mode,
 		backend:            backend,
 		appServerURL:       appServerURL,
@@ -548,13 +551,17 @@ func (a *Agent) StartSession(ctx context.Context, sessionID string) (core.AgentS
 	mode := a.mode
 	model := a.model
 	reasoningEffort := a.reasoningEffort
+	serviceTier := a.serviceTier
 	backend := a.backend
 	appServerURL := a.appServerURL
 	codexHome := a.codexHome
 	systemPrompt := a.systemPrompt
 	appendPrompt := a.appendPrompt
 	cliBin := a.cmd
-	cliExtraArgs := a.cliExtraArgs
+	cliExtraArgs := append([]string(nil), a.cliExtraArgs...)
+	if a.serviceTier != "" {
+		cliExtraArgs = append(cliExtraArgs, "-c", fmt.Sprintf("service_tier=%q", a.serviceTier))
+	}
 	workDir := a.workDir
 	// Order matters for MergeEnv override semantics (later wins):
 	//   1. configEnv — static env from [projects.agent.options.env]
@@ -583,7 +590,7 @@ func (a *Agent) StartSession(ctx context.Context, sessionID string) (core.AgentS
 	}
 
 	if backend == "app_server" {
-		return newAppServerSession(ctx, cliBin, cliExtraArgs, appServerURL, workDir, model, reasoningEffort, mode, sessionID, baseURL, provName, extraEnv, codexHome, systemPrompt, appendPrompt)
+		return newAppServerSession(ctx, cliBin, cliExtraArgs, appServerURL, workDir, model, reasoningEffort, mode, sessionID, baseURL, provName, extraEnv, codexHome, systemPrompt, appendPrompt, serviceTier)
 	}
 	if codexHome != "" {
 		extraEnv = append(extraEnv, "CODEX_HOME="+codexHome)
@@ -655,6 +662,9 @@ func (a *Agent) workspaceAgentOptionsLocked() map[string]any {
 	}
 	if a.reasoningEffort != "" {
 		opts["reasoning_effort"] = a.reasoningEffort
+	}
+	if a.serviceTier != "" {
+		opts["service_tier"] = a.serviceTier
 	}
 	if a.appServerURL != "" {
 		opts["app_server_url"] = a.appServerURL
