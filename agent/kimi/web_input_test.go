@@ -282,3 +282,52 @@ func TestWebFilesRetainedWhenPromptSubmissionUncertain(t *testing.T) {
 		t.Fatalf("resubmitted or deleted possibly referenced file: posts=%d deletes=%d", posts, deletes)
 	}
 }
+
+func TestWebBusyMessageModeDefaultsValidationAndWorkspaceCopy(t *testing.T) {
+	for _, tc := range []struct {
+		mode                any
+		set, steer, wantErr bool
+	}{
+		{nil, false, false, false}, {"queue", true, false, false}, {"steer", true, true, false},
+		{" STEER ", true, true, false}, {"invalid", true, false, true}, {true, true, false, true}, {"", true, false, true},
+	} {
+		opts := map[string]any{"backend": "web", "work_dir": t.TempDir()}
+		if tc.set {
+			opts["busy_message_mode"] = tc.mode
+		}
+		a, err := New(opts)
+		if tc.wantErr {
+			if err == nil {
+				t.Fatalf("accepted mode %v", tc.mode)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		web := a.(*webAgent)
+		if web.AutoSteerBusyMessages() != tc.steer || !web.QueueBusyMedia() {
+			t.Fatalf("wrong busy policy for %v", tc.mode)
+		}
+		copied, err := New(web.WorkspaceAgentOptions())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if copied.(*webAgent).AutoSteerBusyMessages() != tc.steer {
+			t.Fatal("workspace lost busy mode")
+		}
+	}
+}
+
+func TestWebBusyMessageModeRejectsOldNameAndUnsupportedBackend(t *testing.T) {
+	for _, opts := range []map[string]any{
+		{"backend": "web", "web_busy_message_mode": "steer"},
+		{"backend": "web", "busy_message_mode": "queue", "web_busy_message_mode": "steer"},
+		{"backend": "exec", "busy_message_mode": "steer"},
+		{"busy_message_mode": "steer"},
+	} {
+		if _, err := New(opts); err == nil {
+			t.Fatalf("accepted unsupported option: %v", opts)
+		}
+	}
+}

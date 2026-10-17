@@ -2280,6 +2280,8 @@ app_secret = "your-feishu-app-secret"
 # web_url = "http://127.0.0.1:58627"
 # web_token_file = "/home/your-user/.kimi-code/server.token"
 # web_attach_only = true # require /attach or /switch; default false allows new sessions
+# busy_message_mode = "queue" # "steer": auto-steer plain text while busy; media stays queued
+# 忙碌时默认排队；设为 "steer" 自动插入普通文字，图片和文件仍排队。
 # The following CLI-only model/mode/env settings must be omitted for backend="web".
 # work_dir = "/path/to/project"
 # mode = "default"  # "default" | "yolo" | "plan" | "quiet"

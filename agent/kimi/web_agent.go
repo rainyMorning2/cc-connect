@@ -16,12 +16,13 @@ import (
 )
 
 type webAgent struct {
-	api        *webAPI
-	workDir    string
-	attachOnly bool
-	mu         sync.Mutex
-	sessions   map[*webSession]struct{}
-	stopped    bool
+	api             *webAPI
+	workDir         string
+	attachOnly      bool
+	busyMessageMode string
+	mu              sync.Mutex
+	sessions        map[*webSession]struct{}
+	stopped         bool
 }
 
 var _ core.AgentSessionAttacher = (*webAgent)(nil)
@@ -77,18 +78,26 @@ func newWebAgent(opts map[string]any) (core.Agent, error) {
 			return nil, fmt.Errorf("kimi web: web_attach_only must be a boolean")
 		}
 	}
+	if _, exists := opts["web_busy_message_mode"]; exists {
+		return nil, fmt.Errorf("kimi web: web_busy_message_mode is unsupported; use busy_message_mode")
+	}
+	busyMode, err := core.ParseBusyMessageMode(opts)
+	if err != nil {
+		return nil, fmt.Errorf("kimi web: %w", err)
+	}
 	for _, key := range []string{"env", "model", "mode", "provider", "timeout_mins"} {
 		if _, ok := opts[key]; ok {
 			return nil, fmt.Errorf("kimi web: configure %s in the Kimi server; attached settings are preserved", key)
 		}
 	}
-	return &webAgent{api: &webAPI{base: strings.TrimRight(base, "/"), tokenFile: token, client: client}, workDir: workDir, attachOnly: attachOnly, sessions: map[*webSession]struct{}{}}, nil
+	return &webAgent{api: &webAPI{base: strings.TrimRight(base, "/"), tokenFile: token, client: client}, workDir: workDir, attachOnly: attachOnly, busyMessageMode: busyMode, sessions: map[*webSession]struct{}{}}, nil
 }
-func (*webAgent) Name() string                { return "kimi" }
-func (*webAgent) AutoSteerBusyMessages() bool { return false }
-func (a *webAgent) GetWorkDir() string        { return a.workDir }
+func (*webAgent) Name() string                  { return "kimi" }
+func (a *webAgent) AutoSteerBusyMessages() bool { return a.busyMessageMode == "steer" }
+func (*webAgent) QueueBusyMedia() bool          { return true }
+func (a *webAgent) GetWorkDir() string          { return a.workDir }
 func (a *webAgent) BaseOpts() map[string]any {
-	return map[string]any{"backend": "web", "web_url": a.api.base, "web_token_file": a.api.tokenFile, "web_attach_only": a.attachOnly}
+	return map[string]any{"backend": "web", "web_url": a.api.base, "web_token_file": a.api.tokenFile, "web_attach_only": a.attachOnly, "busy_message_mode": a.busyMessageMode}
 }
 func (a *webAgent) StartSession(ctx context.Context, id string) (core.AgentSession, error) {
 	if id != "" && id != core.ContinueSession {

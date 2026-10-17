@@ -28,6 +28,7 @@ work_dir = "/absolute/path/to/project"
 web_url = "http://127.0.0.1:58627"
 web_token_file = "/home/your-user/.kimi-code/server.token"
 web_attach_only = true
+busy_message_mode = "queue" # 改为 "steer" 开启忙碌时普通文字自动插入
 
 # 按现有配置方式添加飞书、Telegram 等 platform。
 ```
@@ -42,6 +43,8 @@ web_attach_only = true
 模型、权限、Provider 在 Kimi 服务或浏览器中配置；此后端不接受
 `model`、`mode`、`provider`、`env`、`timeout_mins` 覆盖。
 
+`busy_message_mode` 与 Codex 托管后端使用同一参数名，默认 `"queue"`，可选 `"steer"`。
+旧名 `web_busy_message_mode` 不再接受，需要修改配置。
 
 ## 操作
 
@@ -55,7 +58,7 @@ web_attach_only = true
 |---|---|
 | `/list` | 从服务读取会话，仅列出配置的 `work_dir` |
 | `/attach`、`/switch` | 接入已有会话，校验工作目录，不修改其设置 |
-| 普通消息 | 忙碌时排队，等待当前轮次结束 |
+| 普通消息 | 使用同一服务提交 prompt；忙碌时按 `busy_message_mode` 排队或自动 steer |
 | `/new` 后发送消息 | `web_attach_only = false` 时可新建服务端会话；默认值为 false |
 | `/history` | 读取服务端历史，包含其他客户端发起的对话 |
 | `/stop` | 按当前 prompt ID 停止执行；旧轮次的停止请求不会取消新轮次 |
@@ -79,7 +82,9 @@ web_attach_only = true
 
 `/steer` 先提交一条 prompt，再尝试将这条 prompt 插入当前轮次。
 两步之间发生轮次切换时，按 Kimi Web 的原生行为，指令可能插入新的轮次；
-普通消息默认排队，不自动 steer。空闲时照常开始新轮次。
+没有活动轮次时，也可能作为独立轮次直接开始执行。普通消息默认排队。设置 `busy_message_mode = "steer"` 后，忙碌时直接发文字就会自动 steer；
+图片、文件以及同时带文字的附件消息仍整体排队。开关对浏览器和聊天端发起的活动轮次都生效，
+空闲时照常开始新轮次，审批和问答回复仍优先由交互流程处理。
 
 聊天端分别反馈已插入、仍排队、已独立开始执行、已处理或结果未确认。
 同一条指令不会因为注入失败而自动重新提交；收到结果未确认提示时，先查看会话。
