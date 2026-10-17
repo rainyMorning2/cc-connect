@@ -3630,3 +3630,118 @@ func TestCUJ_C7_RecoveredTerminalResultDrainsQueue(t *testing.T) {
 	env.send("/history")
 	env.await("RECOVERED ANSWER")
 }
+
+// The browser and IM client can alternate turns on the same runtime. Detach
+// removes the observer without cancelling work owned by the other client.
+func TestCUJ_C7_SharedBrowserAndIMAlternateThenDetach(t *testing.T) {
+	env := newSharedTestEnv(t)
+	env.send("/attach first")
+	env.await("Attached to session first")
+	as := env.a.connection("first")
+	as.emit(Event{Type: EventUserMessage, TurnID: "active-first", Content: "BROWSER QUESTION"})
+	as.mu.Lock()
+	as.turn = ""
+	as.mu.Unlock()
+	as.emit(Event{Type: EventResult, TurnID: "active-first", Content: "BROWSER ANSWER", Done: true})
+	env.await("BROWSER ANSWER")
+	env.send("IM FOLLOWUP")
+	env.await("RECOVERY on first")
+	env.send("/history 10")
+	env.await("BROWSER QUESTION")
+	env.await("IM FOLLOWUP")
+	env.send("/detach")
+	env.await(env.e.i18n.T(MsgSharedDetached))
+}
+
+type bestEffortCUJAgent struct{ *sharedTestAgent }
+
+func (a *bestEffortCUJAgent) AttachSession(ctx context.Context, id string) (AgentSession, error) {
+	as, err := a.sharedTestAgent.AttachSession(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &bestEffortCUJSession{SharedAgentSession: as.(SharedAgentSession)}, nil
+}
+
+type bestEffortCUJSession struct{ SharedAgentSession }
+
+func (s *bestEffortCUJSession) SteerCurrent(text string) (SteerOutcome, error) {
+	switch text {
+	case "insert":
+		return SteerInserted, nil
+	case "queue":
+		return SteerQueued, nil
+	case "run":
+		return SteerRunning, nil
+	case "done":
+		return SteerProcessed, nil
+	default:
+		return SteerUnconfirmed, nil
+	}
+}
+
+func TestCUJ_C7_SharedBestEffortSteerReportsAcceptedState(t *testing.T) {
+	env := newSharedTestEnv(t)
+	env.e.agent = &bestEffortCUJAgent{env.a}
+	env.send("/attach first")
+	env.await("Attached to session first")
+	for _, step := range []struct {
+		text string
+		key  MsgKey
+	}{
+		{"insert", MsgSharedSteerAccepted}, {"queue", MsgSharedSteerQueued}, {"run", MsgSharedSteerRunning},
+		{"done", MsgSharedSteerProcessed}, {"unknown", MsgSharedSteerUnconfirmed},
+	} {
+		env.send("/steer " + step.text)
+		env.await(env.e.i18n.T(step.key))
+	}
+	env.e.ReceiveMessage(env.p, &Message{SessionKey: "test:user", Platform: "test", UserID: "user", MessageID: "steer-file", Content: "/steer insert", ReplyCtx: "reply", Files: []FileAttachment{{FileName: "log.txt", Data: []byte("log")}}})
+	env.await(env.e.i18n.T(MsgSharedSteerTextOnly))
+	env.send("/detach")
+	env.await(env.e.i18n.T(MsgSharedDetached))
+	if strings.Contains(env.visible(), "RECOVERY on first") {
+		t.Fatal("steer fell through to ordinary input")
+	}
+}
+
+func TestCUJ_C7_SharedAutomaticBestEffortSteerKeepsMediaQueued(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("enabled=%t", enabled), func(t *testing.T) {
+			env, a := newSharedCompatEnv(t)
+			env.e.agent = &bestEffortAutoCompatAgent{queuedExternalAgent: &queuedExternalAgent{a}, enabled: enabled}
+			env.send("/attach first")
+			env.await("Attached to session first")
+			env.send("insert")
+			if enabled {
+				env.await(env.e.i18n.T(MsgSharedSteerAccepted))
+				env.send("unknown")
+				env.await(env.e.i18n.T(MsgSharedSteerUnconfirmed))
+			} else {
+				env.await(env.e.i18n.T(MsgMessageQueued))
+			}
+			env.e.ReceiveMessage(env.p, &Message{SessionKey: "test:user", Platform: "test", UserID: "user", ReplyCtx: "reply", MessageID: "media", Content: "inspect media", Images: []ImageAttachment{{Data: []byte("image")}}, Files: []FileAttachment{{FileName: "log.txt", Data: []byte("log")}}})
+			env.await(env.e.i18n.T(MsgMessageQueued))
+			as := a.connection("first")
+			as.mu.Lock()
+			as.turn = ""
+			as.mu.Unlock()
+			as.emit(Event{Type: EventResult, TurnID: "active-first", Content: "BROWSER DONE", Done: true})
+			if !enabled {
+				first := awaitSharedCompatCall(t, a)
+				if first.prompt != "insert" {
+					t.Fatalf("text was lost: %q", first.prompt)
+				}
+				first.finish("QUEUED TEXT DONE")
+				env.await("QUEUED TEXT DONE")
+			}
+			media := awaitSharedCompatCall(t, a)
+			if media.prompt != "inspect media" || len(media.images) != 1 || len(media.files) != 1 || string(media.files[0].Data) != "log" {
+				t.Fatalf("media lost or an uncertain steer was resubmitted: %+v", media)
+			}
+			media.finish("MEDIA DONE")
+			env.await("MEDIA DONE")
+			env.send("/detach")
+			env.await(env.e.i18n.T(MsgSharedDetached))
+		})
+	}
+}

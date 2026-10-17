@@ -53,7 +53,12 @@ func (e *Engine) handleSharedBusyMessage(p Platform, msg *Message, agent Agent, 
 	if runtime.TurnID == "" {
 		return false
 	}
-	if !policy.AutoSteerBusyMessages() {
+	media := len(msg.Images) > 0 || len(msg.Files) > 0
+	queueMedia := false
+	if capability, ok := agent.(AgentBusyMediaQueuer); ok {
+		queueMedia = capability.QueueBusyMedia()
+	}
+	if !policy.AutoSteerBusyMessages() || (media && queueMedia) {
 		if !e.queueMessageForBusySession(p, msg, key) {
 			return false
 		}
@@ -66,19 +71,19 @@ func (e *Engine) handleSharedBusyMessage(p Platform, msg *Message, agent Agent, 
 		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgSharedSteerTextOnly))
 		return true
 	}
-	steerer, ok := as.(AgentSessionSteerer)
-	if !ok {
-		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgSharedUnsupported))
+	keyMessage, err := steerSharedSession(as, runtime.TurnID, msg.Content)
+	if err != nil {
+		e.reply(p, msg.ReplyCtx, e.i18n.Tf(MsgError, err))
 		return true
 	}
-	if err := steerer.Steer(runtime.TurnID, msg.Content); err != nil {
-		e.reply(p, msg.ReplyCtx, e.i18n.Tf(MsgError, err))
+	if keyMessage == MsgSharedUnsupported || keyMessage == MsgSharedSteerUnconfirmed {
+		e.reply(p, msg.ReplyCtx, e.i18n.T(keyMessage))
 		return true
 	}
 	session.TouchUserActivity()
 	e.noteUserMessageAccepted(key, msg.UserMessageTimeMs)
 	runMessageAccepted(msg)
-	e.reply(p, msg.ReplyCtx, e.i18n.T(MsgSharedSteerAccepted))
+	e.reply(p, msg.ReplyCtx, e.i18n.T(keyMessage))
 	return true
 }
 
