@@ -1716,7 +1716,7 @@ app_secret = "your-feishu-app-secret"
 # daemon_reconnect_attempts = 3 # retries after disconnect; 0 means no retries (initial connection still required)
 #                               # 断线后重试次数；0 完全禁用重连，仍需要首次连接成功
 # daemon_enable_steer = true # allow /steer for the active turn / 允许向当前轮次插入文本
-# daemon_busy_message_mode = "queue" # default: wait for the active turn to finish; "steer": insert ordinary text into it
+# busy_message_mode = "queue" # default: wait for the active turn to finish; "steer": insert ordinary text into it
 # Busy handling applies to turns started by any client (CLI, IDE or chat).
 # 忙碌策略对任何客户端发起的任务生效；steer 插入普通文本，queue 等任务结束。
 # Pending approvals/questions still consume their answers first; attachments cannot be steered.

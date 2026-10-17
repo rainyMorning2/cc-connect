@@ -83,7 +83,7 @@ func New(opts map[string]any) (core.Agent, error) {
 	}
 	if transport != "managed_daemon" {
 		for key := range opts {
-			if strings.HasPrefix(key, "daemon_") {
+			if strings.HasPrefix(key, "daemon_") || key == "busy_message_mode" {
 				return nil, fmt.Errorf("codex: %s requires managed_daemon transport", key)
 			}
 		}

@@ -30,7 +30,7 @@ func parseManagedOptions(opts map[string]any) (managedOptions, error) {
 			continue
 		}
 		switch key {
-		case "daemon_socket", "daemon_attach_only", "daemon_reconnect_attempts", "daemon_enable_steer", "daemon_enable_interrupt", "daemon_enable_approvals", "daemon_enable_questions", "daemon_enable_async_questions", "daemon_enable_delete", "daemon_busy_message_mode":
+		case "daemon_socket", "daemon_attach_only", "daemon_reconnect_attempts", "daemon_enable_steer", "daemon_enable_interrupt", "daemon_enable_approvals", "daemon_enable_questions", "daemon_enable_async_questions", "daemon_enable_delete":
 		default:
 			return config, fmt.Errorf("codex: unknown managed daemon option %s", key)
 		}
@@ -52,19 +52,12 @@ func parseManagedOptions(opts map[string]any) (managedOptions, error) {
 			*target = parsed
 		}
 	}
-	if value, exists := opts["daemon_busy_message_mode"]; exists {
-		mode, ok := value.(string)
-		if !ok {
-			return config, fmt.Errorf("codex: daemon_busy_message_mode must be queue or steer")
-		}
-		mode = strings.ToLower(strings.TrimSpace(mode))
-		if mode != "queue" && mode != "steer" {
-			return config, fmt.Errorf("codex: daemon_busy_message_mode must be queue or steer")
-		}
-		config.busyMessageMode = mode
+	config.busyMessageMode, err = core.ParseBusyMessageMode(opts)
+	if err != nil {
+		return config, fmt.Errorf("codex: %w", err)
 	}
 	if config.busyMessageMode == "steer" && !config.steer {
-		return config, fmt.Errorf("codex: daemon_busy_message_mode=steer requires daemon_enable_steer=true")
+		return config, fmt.Errorf("codex: busy_message_mode=steer requires daemon_enable_steer=true")
 	}
 	if value, ok := opts["daemon_reconnect_attempts"]; ok {
 		switch n := value.(type) {
@@ -400,7 +393,7 @@ func (a *managedAgent) WorkspaceAgentOptions() map[string]any {
 	opts["daemon_enable_questions"] = a.daemon.questions
 	opts["daemon_enable_async_questions"] = a.daemon.asyncQuestions
 	opts["daemon_enable_delete"] = a.daemon.deleteThreads
-	opts["daemon_busy_message_mode"] = a.daemon.busyMessageMode
+	opts["busy_message_mode"] = a.daemon.busyMessageMode
 	delete(opts, "app_server_url")
 	return opts
 }

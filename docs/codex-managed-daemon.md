@@ -16,7 +16,7 @@ daemon_attach_only = true
 daemon_socket = "/path/to/app-server-control.sock"
 daemon_reconnect_attempts = 3
 daemon_enable_steer = true
-daemon_busy_message_mode = "queue"
+busy_message_mode = "queue"
 daemon_enable_interrupt = true
 daemon_enable_approvals = true
 daemon_enable_questions = true
@@ -26,6 +26,9 @@ daemon_enable_delete = true
 
 ### Options
 
+`busy_message_mode` is shared with the Kimi Web backend. The old
+`daemon_busy_message_mode` name is rejected; rename it in existing configurations.
+
 | Option | Default | Meaning |
 |---|---:|---|
 | `backend` | `"exec"` | Set to `"app_server"` to enable App Server. |
@@ -34,7 +37,7 @@ daemon_enable_delete = true
 | `daemon_socket` | Unset | Daemon control socket path. When omitted, CC-Connect uses read-only CLI discovery. |
 | `daemon_reconnect_attempts` | `3` | Number of retries after disconnection. `0` disables all automatic retries; it does not skip the initial connection. |
 | `daemon_enable_steer` | `true` | Allow `/steer` to inject text into the active turn. |
-| `daemon_busy_message_mode` | `"queue"` | `queue` waits for the active turn to finish; `steer` inserts ordinary text into it. |
+| `busy_message_mode` | `"queue"` | `queue` waits for the active turn to finish; `steer` inserts ordinary text into it. |
 | `daemon_enable_interrupt` | `true` | Allow stopping the active turn. |
 | `daemon_enable_approvals` | `true` | Receive and handle tool approvals in CC-Connect. Disable to leave them to another daemon client. |
 | `daemon_enable_questions` | `true` | Receive blocking `requestUserInput` questions. |
