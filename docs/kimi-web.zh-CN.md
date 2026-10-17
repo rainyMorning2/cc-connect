@@ -66,6 +66,16 @@ web_attach_only = true
 如果两端同时发送，Kimi 服务可能将其中一个 prompt 排队；CC-Connect 按 prompt ID
 跟踪结果，不会因为浏览器先开始新轮次而重复提交本端消息。
 
+### Steer 的原生语义
+
+`/steer` 先提交一条 prompt，再尝试将这条 prompt 插入当前轮次。
+两步之间发生轮次切换时，按 Kimi Web 的原生行为，指令可能插入新的轮次；
+普通消息默认排队，不自动 steer。空闲时照常开始新轮次。
+
+聊天端分别反馈已插入、仍排队、已独立开始执行、已处理或结果未确认。
+同一条指令不会因为注入失败而自动重新提交；收到结果未确认提示时，先查看会话。
+`/steer` 仅接受文本；文件和图片请通过普通消息发送，带附件的 `/steer` 会明确提示。
+
 ## 恢复与范围
 
 连接断开后最多重试三次，读取完整 snapshot 恢复当前轮次与待处理交互，
@@ -73,7 +83,7 @@ web_attach_only = true
 会读取该 prompt 的历史恢复最终回答。流式增量可能不持久化，因此最终回答以服务历史为准。
 长时间离线期间其他客户端新发起并完成的历史可通过 `/history` 查看。
 
-本版暂未提供 steer、普通文件上传、后台终端控制与聊天端模型/权限切换。
+本版暂未提供普通文件上传、后台终端控制与聊天端模型/权限切换。
 
 官方协议仍是实验性接口；升级 Kimi 后以该服务的 `/openapi.json`、`/asyncapi.json` 为准。
 参考：[Kimi Server API](https://www.kimi.com/code/docs/en/kimi-code-cli/reference/server-api.html)。

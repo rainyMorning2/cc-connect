@@ -337,7 +337,7 @@ func (s *webSession) CurrentSessionID() string  { return s.id }
 func (s *webSession) RuntimeState() core.AgentRuntimeState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return core.AgentRuntimeState{SessionID: s.id, TurnID: s.turn, Connected: s.connected && !s.closed, CanSteer: false}
+	return core.AgentRuntimeState{SessionID: s.id, TurnID: s.turn, Connected: s.connected && !s.closed, CanSteer: s.connected && !s.closed && s.turn != ""}
 }
 func (s *webSession) Alive() bool {
 	s.mu.Lock()

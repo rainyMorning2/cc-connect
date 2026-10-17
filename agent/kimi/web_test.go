@@ -409,6 +409,30 @@ func TestWebLiveTwoObservers(t *testing.T) {
 			}
 		}
 	}
+	if gate := os.Getenv("CC_KIMI_WEB_TEST_MODEL_GATE"); gate != "" {
+		if err := os.WriteFile(gate, []byte("hold"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { os.Remove(gate) })
+		if err := first.Send("Check the fixture", "steer-live", nil, nil); err != nil {
+			t.Fatal(err)
+		}
+		awaitWebEvent(t, first.(*webSession), core.EventTurnStarted)
+		awaitWebEvent(t, second.(*webSession), core.EventTurnStarted)
+		outcome, err := second.(core.AgentBestEffortSteerer).SteerCurrent("Also consider this additional instruction")
+		if err != nil || outcome != core.SteerInserted {
+			t.Fatalf("live steer: %s, %v", outcome, err)
+		}
+		if err := os.Remove(gate); err != nil {
+			t.Fatal(err)
+		}
+		for _, observer := range []core.AgentSession{first, second} {
+			e := awaitWebEvent(t, observer.(*webSession), core.EventResult)
+			if !strings.Contains(e.Content, "KIMI LIVE FIXTURE ANSWER") {
+				t.Fatalf("live steered result: %+v", e)
+			}
+		}
+	}
 	first.Close()
 	if !second.Alive() {
 		t.Fatal("detach stopped peer")
