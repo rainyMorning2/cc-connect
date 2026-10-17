@@ -382,14 +382,17 @@ func (s *webSession) SendTurn(prompt, messageID string, images []core.ImageAttac
 			s.mu.Unlock()
 		}
 	}()
-	content, err := s.promptContent(prompt, images, files)
+	content, uploads, err := s.promptContent(prompt, images, files)
 	if err != nil {
 		return "", err
 	}
 	body, err := s.promptBody(id, content)
 	if err != nil {
+		s.discardUploads(uploads)
 		return "", err
 	}
+	// Once submission is attempted, an ambiguous transport error may still mean
+	// the prompt was accepted. Retain its files; never delete a possible reference.
 	result, err := s.postPrompt(body)
 	if err != nil {
 		return "", err

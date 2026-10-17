@@ -398,7 +398,7 @@ func TestWebLiveTwoObservers(t *testing.T) {
 	}
 	if os.Getenv("CC_KIMI_WEB_TEST_PROMPT") == "1" {
 		for _, sender := range []core.AgentSession{first, second} {
-			if err := sender.Send("Reply with the fixture answer", "live-test", nil, nil); err != nil {
+			if err := sender.Send("Reply with the fixture answer", "live-test", nil, []core.FileAttachment{{FileName: "测试日志.txt", MimeType: "text/plain", Data: []byte("fixture attachment content")}}); err != nil {
 				t.Fatal(err)
 			}
 			for _, observer := range []core.AgentSession{first, second} {

@@ -2,6 +2,8 @@ package kimi
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -9,6 +11,130 @@ import (
 
 	"github.com/chenhg5/cc-connect/core"
 )
+
+func TestWebFilesUploadThenSubmitWithImages(t *testing.T) {
+	f := newWebFixture(t)
+	original := f.server.Config.Handler
+	var mu sync.Mutex
+	var uploads []string
+	var content []map[string]any
+	f.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer fixture-token" {
+			t.Error("missing token")
+			http.Error(w, "unauthorized", 401)
+			return
+		}
+		if r.Method == "POST" && r.URL.Path == "/api/v1/files" {
+			if err := r.ParseMultipartForm(1 << 20); err != nil {
+				t.Error(err)
+				http.Error(w, "bad upload", 400)
+				return
+			}
+			defer r.MultipartForm.RemoveAll()
+			file, h, err := r.FormFile("file")
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			defer file.Close()
+			data, err := io.ReadAll(file)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			if h.Filename != "报告.txt" || r.FormValue("name") != "报告.txt" || h.Header.Get("Content-Type") != "text/plain" {
+				t.Errorf("unexpected upload metadata: %+v %s", h, r.FormValue("name"))
+			}
+			mu.Lock()
+			uploads = append(uploads, string(data))
+			id := fmt.Sprintf("file_%d", len(uploads))
+			mu.Unlock()
+			f.reply(w, map[string]any{"id": id, "name": h.Filename, "media_type": "text/plain", "size": len(data)})
+			return
+		}
+		if r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/prompts") {
+			var body struct {
+				ID      string           `json:"prompt_id"`
+				Content []map[string]any `json:"content"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Error(err)
+				return
+			}
+			mu.Lock()
+			content = body.Content
+			mu.Unlock()
+			f.reply(w, map[string]any{"prompt_id": body.ID, "status": "queued"})
+			return
+		}
+		original.ServeHTTP(w, r)
+	})
+	s := f.attach()
+	_, err := s.SendTurn("inspect both", "message", []core.ImageAttachment{{MimeType: "image/png", Data: []byte("image")}}, []core.FileAttachment{
+		{FileName: "../../报告.txt", MimeType: "text/plain", Data: []byte("first file")},
+		{FileName: "C:\\folder\\报告.txt", MimeType: "text/plain", Data: []byte("second file")},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(uploads) != 2 || uploads[0] != "first file" || uploads[1] != "second file" {
+		t.Fatal(uploads)
+	}
+	if len(content) != 4 || content[0]["text"] != "inspect both" || content[1]["type"] != "image" {
+		t.Fatal(content)
+	}
+	for i, p := range content[2:] {
+		if p["type"] != "file" || p["file_id"] != fmt.Sprintf("file_%d", i+1) || p["name"] != "报告.txt" {
+			t.Fatal(p)
+		}
+	}
+}
+
+func TestWebFileUploadFailureDoesNotSendPartialPrompt(t *testing.T) {
+	f := newWebFixture(t)
+	original := f.server.Config.Handler
+	var mu sync.Mutex
+	uploads, prompts, deletes := 0, 0, 0
+	f.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" && r.URL.Path == "/api/v1/files" {
+			mu.Lock()
+			uploads++
+			n := uploads
+			mu.Unlock()
+			if n == 2 {
+				http.Error(w, "upload failed", 500)
+			} else {
+				f.reply(w, map[string]any{"id": "first-upload", "name": "one.txt", "media_type": "text/plain", "size": 3})
+			}
+			return
+		}
+		if r.Method == "DELETE" && r.URL.Path == "/api/v1/files/first-upload" {
+			mu.Lock()
+			deletes++
+			mu.Unlock()
+			f.reply(w, map[string]any{"deleted": true})
+			return
+		}
+		if r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/prompts") {
+			mu.Lock()
+			prompts++
+			mu.Unlock()
+		}
+		original.ServeHTTP(w, r)
+	})
+	s := f.attach()
+	err := s.Send("", "message", nil, []core.FileAttachment{{FileName: "one.txt", Data: []byte("one")}, {FileName: "two.txt", Data: []byte("two")}})
+	if err == nil {
+		t.Fatal("failed upload accepted")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if uploads != 2 || prompts != 0 || deletes != 1 {
+		t.Fatalf("uploads=%d prompts=%d deletes=%d", uploads, prompts, deletes)
+	}
+}
 
 func TestWebSteerNativeOutcomesNeverResubmit(t *testing.T) {
 	for _, tc := range []struct {
@@ -114,5 +240,45 @@ func TestWebSteerNativeOutcomesNeverResubmit(t *testing.T) {
 				t.Fatalf("injected %d times", injects)
 			}
 		})
+	}
+}
+
+func TestWebFilesRetainedWhenPromptSubmissionUncertain(t *testing.T) {
+	f := newWebFixture(t)
+	original := f.server.Config.Handler
+	var mu sync.Mutex
+	posts, deletes := 0, 0
+	f.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" && r.URL.Path == "/api/v1/files" {
+			f.reply(w, map[string]any{"id": "uploaded", "name": "log.txt", "media_type": "text/plain", "size": 3})
+			return
+		}
+		if r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/prompts") {
+			mu.Lock()
+			posts++
+			mu.Unlock()
+			conn, _, err := w.(http.Hijacker).Hijack()
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			conn.Close()
+			return
+		}
+		if r.Method == "DELETE" {
+			mu.Lock()
+			deletes++
+			mu.Unlock()
+		}
+		original.ServeHTTP(w, r)
+	})
+	s := f.attach()
+	if err := s.Send("inspect", "message", nil, []core.FileAttachment{{FileName: "log.txt", Data: []byte("log")}}); err == nil {
+		t.Fatal("lost response not reported")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if posts != 1 || deletes != 0 {
+		t.Fatalf("resubmitted or deleted possibly referenced file: posts=%d deletes=%d", posts, deletes)
 	}
 }
