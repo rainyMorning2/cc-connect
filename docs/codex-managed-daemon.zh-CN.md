@@ -18,13 +18,15 @@ daemon_attach_only = true
 daemon_socket = "/path/to/app-server-control.sock"
 daemon_reconnect_attempts = 3
 daemon_enable_steer = true
-daemon_busy_message_mode = "queue"
+busy_message_mode = "queue"
 daemon_enable_interrupt = true
 daemon_enable_approvals = true
 daemon_enable_questions = true
 daemon_enable_async_questions = true
 daemon_enable_delete = true
 ```
+
+`busy_message_mode` 与 Kimi Web 使用同一参数名；旧名 `daemon_busy_message_mode` 不再接受，需要修改配置。
 
 ### 配置项
 
@@ -36,7 +38,7 @@ daemon_enable_delete = true
 | `daemon_socket` | 未设置 | daemon 控制 socket。未设置时通过 Codex CLI 进行只读发现。 |
 | `daemon_reconnect_attempts` | `3` | 断线后的重试次数；`0` 完全关闭自动重连，但仍需要首次连接成功。 |
 | `daemon_enable_steer` | `true` | 是否允许通过 `/steer` 向运行中的 turn 注入文本。 |
-| `daemon_busy_message_mode` | `"queue"` | 忙碌时普通文本的处理方式：`queue` 等当前 turn 结束，`steer` 插入当前 turn。 |
+| `busy_message_mode` | `"queue"` | 忙碌时普通文本的处理方式：`queue` 等当前 turn 结束，`steer` 插入当前 turn。 |
 | `daemon_enable_interrupt` | `true` | 是否启用停止当前 turn 的能力。 |
 | `daemon_enable_approvals` | `true` | 是否由 cc-connect 接收并处理工具审批请求。关闭后交给其他 daemon 客户端处理。 |
 | `daemon_enable_questions` | `true` | 是否接收阻塞式 `requestUserInput` 问答。 |
@@ -185,7 +187,7 @@ daemon 退出后，CC-Connect 最多重试 `daemon_reconnect_attempts` 次连接
 
 1. `/attach`、`/steer`、审批和问答命令需要当前 Agent 支持对应的托管会话能力；不支持时会返回能力不可用。
 2. `daemon_attach_only = true` 适合只管理已有 Codex 工作；需要让 cc-connect 创建新 thread 时应设为 `false`。
-3. `daemon_busy_message_mode = "steer"` 只适用于可 steer 的普通文本；待处理审批/问答会优先消费对应答案，附件不能通过 steer 注入。
+3. `busy_message_mode = "steer"` 只适用于可 steer 的普通文本；待处理审批/问答会优先消费对应答案，附件不能通过 steer 注入。
 4. `daemon_socket`、Provider 和凭据应与实际运行 daemon 的环境保持一致。
 
 5. CC-Connect 拒绝连接继承的 `CODEX_THREAD_ID` 所标识的 thread。这是启动当前进程的 Codex thread，拒绝它是为避免自我控制循环；其他正在运行的 thread 仍可接入。

@@ -62,7 +62,7 @@ func TestManagedListSessions_PrefersThreadNameOverPreview(t *testing.T) {
 
 func TestManagedBusyMessageModeConfigAndWorkspaceClone(t *testing.T) {
 	for _, mode := range []string{"queue", "steer"} {
-		a := fixtureManagedAgent(t, "/socket", t.TempDir(), map[string]any{"daemon_busy_message_mode": mode})
+		a := fixtureManagedAgent(t, "/socket", t.TempDir(), map[string]any{"busy_message_mode": mode})
 		if a.AutoSteerBusyMessages() != (mode == "steer") {
 			t.Fatalf("incorrect policy for %s", mode)
 		}
@@ -79,9 +79,9 @@ func TestManagedBusyMessageModeConfigAndWorkspaceClone(t *testing.T) {
 		t.Fatalf("default mode changed: %+v %v", defaults, err)
 	}
 	for _, opts := range []map[string]any{
-		{"daemon_busy_message_mode": "invalid"},
-		{"daemon_busy_message_mode": true},
-		{"daemon_busy_message_mode": "steer", "daemon_enable_steer": false},
+		{"busy_message_mode": "invalid"},
+		{"busy_message_mode": true},
+		{"busy_message_mode": "steer", "daemon_enable_steer": false},
 	} {
 		if _, err := parseManagedOptions(opts); err == nil {
 			t.Fatalf("invalid configuration accepted: %v", opts)
@@ -413,7 +413,7 @@ func TestManagedTransportConfigIsSeparateAndOptIn(t *testing.T) {
 		{"backend": "app_server", "app_server_transport": "unknown"},
 		{"backend": "app_server", "app_server_transport": true},
 		{"backend": "app_server", "daemon_socket": "/socket"},
-		{"backend": "app_server", "daemon_busy_message_mode": "steer"},
+		{"backend": "app_server", "busy_message_mode": "steer"},
 		{"backend": "app_server", "app_server_transport": "managed_daemon", "daemon_socket": "/socket", "app_server_url": "stdio://"},
 		{"backend": "app_server", "app_server_transport": "managed_daemon", "daemon_socket": "/socket", "env": map[string]any{"A": "B"}},
 		{"backend": "app_server", "app_server_transport": "managed_daemon", "daemon_socket": "/socket", "daemon_enable_steer": "yes"},
@@ -611,5 +611,16 @@ func TestManagedHistory_TrimsWithinTurnPreservingItemOrder(t *testing.T) {
 	history, err := a.GetSessionHistory(context.Background(), "target", 2)
 	if err != nil || len(history) != 2 || history[0].Content != "working" || history[1].Content != "answer" {
 		t.Fatalf("history=%v err=%v", history, err)
+	}
+}
+
+func TestManagedBusyMessageModeRejectsOldName(t *testing.T) {
+	for _, opts := range []map[string]any{
+		{"daemon_busy_message_mode": "steer"},
+		{"busy_message_mode": "queue", "daemon_busy_message_mode": "steer"},
+	} {
+		if _, err := parseManagedOptions(opts); err == nil {
+			t.Fatalf("accepted old option: %v", opts)
+		}
 	}
 }

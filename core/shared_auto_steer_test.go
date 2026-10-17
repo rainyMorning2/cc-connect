@@ -235,3 +235,25 @@ func (s *busyRetrySession) SendTurn(prompt, id string, images []ImageAttachment,
 	}
 	return s.sharedCompatSession.SendTurn(prompt, id, images, files)
 }
+
+// This boundary stub offers native best-effort steering plus media queueing.
+type bestEffortAutoCompatAgent struct {
+	*queuedExternalAgent
+	enabled bool
+}
+
+func (a *bestEffortAutoCompatAgent) AutoSteerBusyMessages() bool { return a.enabled }
+func (*bestEffortAutoCompatAgent) QueueBusyMedia() bool          { return true }
+func (a *bestEffortAutoCompatAgent) AttachSession(ctx context.Context, id string) (AgentSession, error) {
+	as, err := a.queuedExternalAgent.AttachSession(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &bestEffortAutoCompatSession{sharedCompatSession: as.(*sharedCompatSession)}, nil
+}
+
+type bestEffortAutoCompatSession struct{ *sharedCompatSession }
+
+func (s *bestEffortAutoCompatSession) SteerCurrent(text string) (SteerOutcome, error) {
+	return (&bestEffortCUJSession{}).SteerCurrent(text)
+}

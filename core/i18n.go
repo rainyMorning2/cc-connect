@@ -1298,6 +1298,34 @@ var messages = map[MsgKey]map[Language]string{
 		LangJapanese:           "使い方：/steer <メッセージ>。",
 		LangSpanish:            "Uso: /steer <mensaje>.",
 	},
+	MsgSharedSteerQueued: {
+		LangEnglish:            "Message submitted, but not inserted into the active turn. It remains queued; do not resend.",
+		LangChinese:            "消息已提交，但未插入当前轮次，仍在排队；请勿重复发送。",
+		LangTraditionalChinese: "訊息已提交，但未插入目前輪次，仍在排隊；請勿重複傳送。",
+		LangJapanese:           "メッセージは送信済みですが、現在のターンには挿入されず待機中です。再送しないでください。",
+		LangSpanish:            "Mensaje enviado, pero no insertado en el turno activo. Sigue en cola; no lo reenvíes.",
+	},
+	MsgSharedSteerRunning: {
+		LangEnglish:            "Message submitted and already running as a separate turn; do not resend.",
+		LangChinese:            "消息已提交，并已作为独立轮次开始执行；请勿重复发送。",
+		LangTraditionalChinese: "訊息已提交，並已作為獨立輪次開始執行；請勿重複傳送。",
+		LangJapanese:           "メッセージは送信済みで、別のターンとして実行中です。再送しないでください。",
+		LangSpanish:            "Mensaje enviado y ya ejecutándose en un turno independiente; no lo reenvíes.",
+	},
+	MsgSharedSteerProcessed: {
+		LangEnglish:            "Message submitted and already processed or consumed by a turn. Check the conversation; do not resend.",
+		LangChinese:            "消息已提交，已被轮次接收或处理完成；请查看会话，不要重复发送。",
+		LangTraditionalChinese: "訊息已提交，已被輪次接收或處理完成；請查看對話，不要重複傳送。",
+		LangJapanese:           "メッセージは送信済みで、ターンに取り込まれたか処理済みです。会話を確認し、再送しないでください。",
+		LangSpanish:            "Mensaje enviado y ya incorporado a un turno o procesado. Revisa la conversación; no lo reenvíes.",
+	},
+	MsgSharedSteerUnconfirmed: {
+		LangEnglish:            "Could not confirm the result. The message may already be submitted; check the conversation before resending.",
+		LangChinese:            "未能确认处理结果，消息可能已经提交；请先检查会话，避免重复发送。",
+		LangTraditionalChinese: "未能確認處理結果，訊息可能已經提交；請先檢查對話，避免重複傳送。",
+		LangJapanese:           "結果を確認できませんでした。送信済みの可能性があるため、再送する前に会話を確認してください。",
+		LangSpanish:            "No se pudo confirmar el resultado. El mensaje podría haberse enviado; revisa la conversación antes de reenviarlo.",
+	},
 	MsgSharedSteerAccepted: {
 		LangEnglish:            "Adjustment accepted for the current turn.",
 		LangChinese:            "当前任务已接收调整指示。",
@@ -5278,6 +5306,10 @@ const (
 	MsgSharedDetached             MsgKey = "shared_detached"
 	MsgSharedSteerUsage           MsgKey = "shared_steerusage"
 	MsgSharedSteerAccepted        MsgKey = "shared_steeraccepted"
+	MsgSharedSteerQueued          MsgKey = "shared_steerqueued"
+	MsgSharedSteerRunning         MsgKey = "shared_steerrunning"
+	MsgSharedSteerProcessed       MsgKey = "shared_steerprocessed"
+	MsgSharedSteerUnconfirmed     MsgKey = "shared_steerunconfirmed"
 	MsgSharedTerminalStopped      MsgKey = "shared_terminalstopped"
 	MsgSharedTerminalsUsage       MsgKey = "shared_terminalsusage"
 	MsgSharedTerminalsStopped     MsgKey = "shared_terminalsstopped"

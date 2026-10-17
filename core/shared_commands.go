@@ -69,21 +69,17 @@ func (e *Engine) handleSharedCommand(p Platform, msg *Message, command string, a
 		e.cleanupInteractiveState(key, state)
 		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgSharedDetached))
 	case "steer":
-		text := strings.TrimSpace(strings.Join(args, " "))
-		steerer, ok := as.(AgentSessionSteerer)
-		if !ok {
-			e.reply(p, msg.ReplyCtx, e.i18n.T(MsgSharedUnsupported))
+		if len(msg.Images) > 0 || len(msg.Files) > 0 {
+			e.reply(p, msg.ReplyCtx, e.i18n.T(MsgSharedSteerTextOnly))
 			return true
 		}
+		text := strings.TrimSpace(strings.Join(args, " "))
 		if text == "" {
 			e.reply(p, msg.ReplyCtx, e.i18n.T(MsgSharedSteerUsage))
 			return true
 		}
-		if err := steerer.Steer(as.RuntimeState().TurnID, text); err != nil {
-			e.reply(p, msg.ReplyCtx, e.i18n.Tf(MsgError, err))
-		} else {
-			e.reply(p, msg.ReplyCtx, e.i18n.T(MsgSharedSteerAccepted))
-		}
+		e.replySharedSteer(p, msg, as, text)
+
 	case "decision", "answer", "skip":
 		e.sharedRequestCommand(p, msg, state, as, command, args)
 	case "terminals":
@@ -292,4 +288,38 @@ func (e *Engine) stopSharedTurn(state *interactiveState, as SharedAgentSession, 
 		state.mu.Unlock()
 	}
 	return canceller.CancelTurn()
+}
+
+func (e *Engine) replySharedSteer(p Platform, msg *Message, as SharedAgentSession, text string) {
+	key, err := steerSharedSession(as, as.RuntimeState().TurnID, text)
+	if err != nil {
+		e.reply(p, msg.ReplyCtx, e.i18n.Tf(MsgError, err))
+		return
+	}
+	e.reply(p, msg.ReplyCtx, e.i18n.T(key))
+}
+
+func steerSharedSession(as SharedAgentSession, expectedTurnID, text string) (MsgKey, error) {
+	key := MsgSharedSteerAccepted
+	var err error
+	if steerer, ok := as.(AgentBestEffortSteerer); ok {
+		var result SteerOutcome
+		result, err = steerer.SteerCurrent(text)
+		switch result {
+		case SteerInserted:
+		case SteerQueued:
+			key = MsgSharedSteerQueued
+		case SteerRunning:
+			key = MsgSharedSteerRunning
+		case SteerProcessed:
+			key = MsgSharedSteerProcessed
+		default:
+			key = MsgSharedSteerUnconfirmed
+		}
+	} else if steerer, ok := as.(AgentSessionSteerer); ok {
+		err = steerer.Steer(expectedTurnID, text)
+	} else {
+		return MsgSharedUnsupported, nil
+	}
+	return key, err
 }

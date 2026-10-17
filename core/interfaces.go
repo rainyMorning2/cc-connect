@@ -772,11 +772,36 @@ type AgentSessionSteerer interface {
 	Steer(expectedTurnID, text string) error
 }
 
+// AgentBestEffortSteerer submits input and tries to insert it into whichever
+// turn is active when the service processes it. Unlike AgentSessionSteerer it
+// does not promise an expected turn ID, and reports accepted-but-not-inserted
+// outcomes so callers never retry an already submitted message.
+type AgentBestEffortSteerer interface {
+	SteerCurrent(text string) (SteerOutcome, error)
+}
+
+type SteerOutcome string
+
+const (
+	SteerInserted    SteerOutcome = "inserted"
+	SteerQueued      SteerOutcome = "queued"
+	SteerRunning     SteerOutcome = "running"
+	SteerProcessed   SteerOutcome = "processed"
+	SteerUnconfirmed SteerOutcome = "unconfirmed"
+)
+
 // AgentAutoSteer opts into sending ordinary messages to an active shared turn.
 // False queues messages until that turn finishes, regardless of its origin.
 // Without this capability the engine retains its existing queue/busy behavior.
 type AgentAutoSteer interface {
 	AutoSteerBusyMessages() bool
+}
+
+// AgentBusyMediaQueuer keeps media-bearing messages queued even when ordinary
+// text is automatically steered. Without this capability, auto-steer retains
+// its existing text-only rejection behavior.
+type AgentBusyMediaQueuer interface {
+	QueueBusyMedia() bool
 }
 
 type BackgroundTerminal struct {

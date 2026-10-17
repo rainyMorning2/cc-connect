@@ -56,6 +56,24 @@ type Agent struct {
 var _ core.HistoryProvider = (*Agent)(nil)
 
 func New(opts map[string]any) (core.Agent, error) {
+	if backend, ok := opts["backend"]; ok {
+		name, valid := backend.(string)
+		if !valid {
+			return nil, fmt.Errorf("kimi: backend must be a string")
+		}
+		switch strings.ToLower(strings.TrimSpace(name)) {
+		case "web":
+			return newWebAgent(opts)
+		case "", "exec":
+		default:
+			return nil, fmt.Errorf("kimi: backend must be exec or web")
+		}
+	}
+	for _, key := range []string{"busy_message_mode", "web_busy_message_mode"} {
+		if _, exists := opts[key]; exists {
+			return nil, fmt.Errorf("kimi: %s requires backend=web", key)
+		}
+	}
 	workDir, _ := opts["work_dir"].(string)
 	if workDir == "" {
 		workDir = "."
