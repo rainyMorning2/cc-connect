@@ -5,12 +5,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"time"
 
 	"github.com/chenhg5/cc-connect/core"
 )
 
 var _ core.ContextUsageReporter = (*webSession)(nil)
+var _ core.AgentRuntimeSettingsReader = (*webSession)(nil)
+
+type webRuntimeStatus struct {
+	Model            *string `json:"model"`
+	ThinkingLevel    *string `json:"thinking_level"`
+	Permission       string  `json:"permission"`
+	ContextTokens    *int    `json:"context_tokens"`
+	MaxContextTokens *int    `json:"max_context_tokens"`
+}
 
 // Kimi sends partial status updates. Pointers distinguish omitted fields from
 // explicit resets, including zero usage after a new turn or compaction.
@@ -76,12 +86,7 @@ func (s *webSession) updateStatus(raw json.RawMessage) error {
 // /status is the server's current runtime state, including resolved defaults.
 // Read it only on attachment/reconnection; subsequent updates arrive over WS.
 func (s *webSession) refreshRuntimeStatus() {
-	var status struct {
-		Model            *string `json:"model"`
-		ThinkingLevel    *string `json:"thinking_level"`
-		ContextTokens    *int    `json:"context_tokens"`
-		MaxContextTokens *int    `json:"max_context_tokens"`
-	}
+	var status webRuntimeStatus
 	ctx, cancel := context.WithTimeout(s.ctx, 2*time.Second)
 	defer cancel()
 	if err := s.agent.api.request(ctx, "GET", webSessionPath(s.id)+"/status", nil, &status); err != nil {
@@ -89,6 +94,29 @@ func (s *webSession) refreshRuntimeStatus() {
 		return
 	}
 	s.applyStatus(webStatus{Model: status.Model, ThinkingEffort: status.ThinkingLevel, ContextTokens: status.ContextTokens, MaxContextTokens: status.MaxContextTokens})
+}
+
+func (s *webSession) ReadRuntimeSettings(ctx context.Context) (core.AgentRuntimeSettings, error) {
+	var record webRecord
+	if err := s.agent.api.request(ctx, "GET", webSessionPath(s.id), nil, &record); err != nil {
+		return core.AgentRuntimeSettings{}, err
+	}
+	if record.ID != s.id || filepath.Clean(record.Metadata.Cwd) != s.workDir {
+		return core.AgentRuntimeSettings{}, fmt.Errorf("kimi web: runtime settings returned an out-of-scope session")
+	}
+	var status webRuntimeStatus
+	if err := s.agent.api.request(ctx, "GET", webSessionPath(s.id)+"/status", nil, &status); err != nil {
+		return core.AgentRuntimeSettings{}, err
+	}
+	s.applyStatus(webStatus{Model: status.Model, ThinkingEffort: status.ThinkingLevel, ContextTokens: status.ContextTokens, MaxContextTokens: status.MaxContextTokens})
+	settings := core.AgentRuntimeSettings{ApprovalPolicy: status.Permission}
+	if status.Model != nil {
+		settings.Model = *status.Model
+	}
+	if status.ThinkingLevel != nil {
+		settings.ReasoningEffort = *status.ThinkingLevel
+	}
+	return settings, nil
 }
 
 func (s *webSession) applyStatus(status webStatus) {

@@ -32,6 +32,8 @@ type webFixture struct {
 	queueOnly       bool
 	status          map[string]any
 	runtimeStatus   map[string]any
+	creates         []map[string]any
+	profiles        []map[string]any
 }
 
 func newWebFixture(t *testing.T) *webFixture {
@@ -119,6 +121,11 @@ func (f *webFixture) serve(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == "GET" && r.URL.Path == "/api/v1/sessions/session_test":
 		f.reply(w, f.snapshot.Session)
+	case r.Method == "GET" && r.URL.Path == "/api/v1/sessions/session_stale":
+		record := f.snapshot.Session
+		record.ID = "session_stale"
+		record.Metadata.Cwd = "/old/deleted/workspace"
+		f.reply(w, record)
 	case r.Method == "GET" && strings.HasSuffix(r.URL.Path, "/status"):
 		if f.runtimeStatus != nil {
 			f.reply(w, f.runtimeStatus)
@@ -127,12 +134,42 @@ func (f *webFixture) serve(w http.ResponseWriter, r *http.Request) {
 		}
 	case r.Method == "GET" && r.URL.Path == "/api/v1/config":
 		f.reply(w, map[string]string{"default_model": "fixture-model"})
+	case r.Method == "GET" && r.URL.Path == "/api/v1/models":
+		f.reply(w, map[string]any{"items": []map[string]any{
+			{"model": "fixture-model", "display_name": "Fixture", "support_efforts": []string{"low", "high"}},
+			{"model": "alternate-model", "display_name": "Alternate", "support_efforts": []string{"off", "max"}},
+		}})
+	case r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/profile"):
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			f.t.Errorf("decode profile update: %v", err)
+			return
+		}
+		f.profiles = append(f.profiles, body)
+		if f.runtimeStatus == nil {
+			f.runtimeStatus = map[string]any{}
+		}
+		config, _ := body["agent_config"].(map[string]any)
+		if model, ok := config["model"].(string); ok {
+			f.snapshot.Session.AgentConfig.Model = model
+			f.runtimeStatus["model"] = model
+		}
+		if effort, ok := config["thinking"].(string); ok {
+			f.runtimeStatus["thinking_level"] = effort
+		}
+		f.reply(w, f.snapshot.Session)
 	case r.Method == "GET" && strings.HasSuffix(r.URL.Path, "/snapshot"):
 		f.snapshot.Seq = f.seq
 		f.reply(w, f.snapshot)
 	case r.Method == "GET" && r.URL.Path == "/api/v1/sessions":
 		f.reply(w, map[string]any{"items": []webRecord{f.snapshot.Session}, "has_more": false})
 	case r.Method == "POST" && r.URL.Path == "/api/v1/sessions":
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			f.t.Errorf("decode session creation: %v", err)
+			return
+		}
+		f.creates = append(f.creates, body)
 		f.reply(w, f.snapshot.Session)
 	case r.Method == "GET" && strings.HasSuffix(r.URL.Path, "/prompts"):
 		f.reply(w, map[string]any{"active": nil, "queued": []any{}})

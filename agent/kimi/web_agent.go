@@ -19,6 +19,8 @@ import (
 type webAgent struct {
 	api             *webAPI
 	workDir         string
+	model, effort   string // new-session defaults, guarded by mu
+	models          []webModel
 	attachOnly      bool
 	busyMessageMode string
 	mu              sync.Mutex
@@ -87,12 +89,22 @@ func newWebAgent(opts map[string]any) (core.Agent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("kimi web: %w", err)
 	}
-	for _, key := range []string{"env", "model", "mode", "provider", "timeout_mins"} {
+	for _, key := range []string{"env", "mode", "provider", "timeout_mins"} {
 		if _, ok := opts[key]; ok {
 			return nil, fmt.Errorf("kimi web: configure %s in the Kimi server; attached settings are preserved", key)
 		}
 	}
-	return &webAgent{api: &webAPI{base: strings.TrimRight(base, "/"), tokenFile: token, client: client}, workDir: workDir, attachOnly: attachOnly, busyMessageMode: busyMode, sessions: map[*webSession]struct{}{}}, nil
+	defaults := map[string]string{}
+	for _, key := range []string{"model", "reasoning_effort"} {
+		if raw, exists := opts[key]; exists {
+			value, ok := raw.(string)
+			if !ok {
+				return nil, fmt.Errorf("kimi web: %s must be a string", key)
+			}
+			defaults[key] = strings.TrimSpace(value)
+		}
+	}
+	return &webAgent{api: &webAPI{base: strings.TrimRight(base, "/"), tokenFile: token, client: client}, workDir: workDir, model: defaults["model"], effort: defaults["reasoning_effort"], attachOnly: attachOnly, busyMessageMode: busyMode, sessions: map[*webSession]struct{}{}}, nil
 }
 func (*webAgent) Name() string                  { return "kimi" }
 func (a *webAgent) AutoSteerBusyMessages() bool { return a.busyMessageMode == "steer" }
@@ -109,10 +121,14 @@ func (a *webAgent) SetWorkDir(dir string) {
 	slog.Info("kimi web: work_dir changed", "work_dir", dir)
 }
 func (a *webAgent) BaseOpts() map[string]any {
-	return map[string]any{"backend": "web", "web_url": a.api.base, "web_token_file": a.api.tokenFile, "web_attach_only": a.attachOnly, "busy_message_mode": a.busyMessageMode}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return map[string]any{"backend": "web", "web_url": a.api.base, "web_token_file": a.api.tokenFile, "web_attach_only": a.attachOnly, "busy_message_mode": a.busyMessageMode, "model": a.model, "reasoning_effort": a.effort}
 }
 func (a *webAgent) StartSession(ctx context.Context, id string) (core.AgentSession, error) {
-	workDir := a.GetWorkDir()
+	a.mu.Lock()
+	workDir, model, effort := a.workDir, a.model, a.effort
+	a.mu.Unlock()
 	if id != "" && id != core.ContinueSession {
 		return a.attachSession(ctx, id, workDir)
 	}
@@ -131,8 +147,18 @@ func (a *webAgent) StartSession(ctx context.Context, id string) (core.AgentSessi
 		return nil, err
 	}
 	body := map[string]any{"metadata": map[string]string{"cwd": workDir}}
-	if config.Model != "" {
-		body["agent_config"] = map[string]any{"model": config.Model}
+	if model == "" {
+		model = config.Model
+	}
+	agentConfig := map[string]any{}
+	if model != "" {
+		agentConfig["model"] = model
+	}
+	if effort != "" {
+		agentConfig["thinking"] = effort
+	}
+	if len(agentConfig) > 0 {
+		body["agent_config"] = agentConfig
 	}
 	var r webRecord
 	if err := a.api.request(ctx, "POST", "/api/v1/sessions", body, &r); err != nil {

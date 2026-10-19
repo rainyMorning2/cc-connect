@@ -3231,7 +3231,40 @@ func TestCUJ_C8_SharedStopAllPreservesActiveTurn(t *testing.T) {
 
 // Default-setting commands must not detach a shared runtime or discard its
 // history. Queries show server settings separately from creation defaults.
+type cujMultiwordEffortAgent struct{ *sharedSettingsTestAgent }
+
+func (*cujMultiwordEffortAgent) AvailableReasoningEfforts() []string {
+	return []string{"high", "extra high"}
+}
+
 func TestCUJ_C7_SharedSettingsPreserveLiveConversation(t *testing.T) {
+	t.Run("current session model and effort capabilities", func(t *testing.T) {
+		env, _, as := newLiveSettingsEnv(t)
+		env.send("/model switch target-model")
+		env.await("Model: target-model · Reasoning: medium")
+		env.send("/effort extra high")
+		env.await("Model: target-model · Reasoning: extra high")
+		env.send("/history 10")
+		env.await("KEEP HISTORY")
+		as.emit(Event{Type: EventText, Content: "LIVE AFTER CURRENT SETTINGS", Metadata: map[string]any{"phase": "commentary"}})
+		env.await("LIVE AFTER CURRENT SETTINGS")
+		env.send("/steer same session")
+		env.await("STEER observed: same session")
+	})
+
+	t.Run("service effort labels containing spaces", func(t *testing.T) {
+		env, a, _ := newSharedSettingsEnv(t)
+		env.e.agent = &cujMultiwordEffortAgent{a}
+		env.send("/effort")
+		env.await("extra high")
+		env.send("/effort extra high")
+		env.await("Reasoning: extra high")
+		env.send("/history 10")
+		env.await("KEEP HISTORY")
+		env.send("/steer same conversation")
+		env.await("STEER observed: same conversation")
+	})
+
 	env, _, as := newSharedSettingsEnv(t)
 	env.send("/model switch new-model")
 	env.await("New-thread defaults updated")

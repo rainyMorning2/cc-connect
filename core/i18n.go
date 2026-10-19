@@ -962,6 +962,27 @@ var messages = map[MsgKey]map[Language]string{
 		LangJapanese:           "変更は新規スレッドの作成時にのみ適用されます。接続中のスレッドの設定・接続・履歴は保持されます。",
 		LangSpanish:            "Los cambios solo se aplican al crear un hilo nuevo. El hilo conectado conserva su configuración, conexión e historial.",
 	},
+	MsgSessionSettingsSaved: {
+		LangEnglish:            "Current session settings updated.",
+		LangChinese:            "已更新当前会话设置。",
+		LangTraditionalChinese: "已更新目前會話設定。",
+		LangJapanese:           "現在のセッション設定を更新しました。",
+		LangSpanish:            "Se actualizó la configuración de la sesión actual.",
+	},
+	MsgSessionSettingsRuntime: {
+		LangEnglish:            "Current session (reported by server):\nModel: %s · Reasoning: %s",
+		LangChinese:            "当前会话（服务端返回）：\n模型：%s · 推理强度：%s",
+		LangTraditionalChinese: "目前會話（伺服器回傳）：\n模型：%s · 推理強度：%s",
+		LangJapanese:           "現在のセッション（サーバーの設定）：\nモデル: %s · 推論: %s",
+		LangSpanish:            "Sesión actual (según el servidor):\nModelo: %s · Razonamiento: %s",
+	},
+	MsgSessionSettingsScope: {
+		LangEnglish:            "Changes apply to this session and are shared with other connected clients.",
+		LangChinese:            "修改作用于当前会话，并同步到其他已连接的客户端。",
+		LangTraditionalChinese: "修改套用至目前會話，並同步至其他已連線的用戶端。",
+		LangJapanese:           "変更は現在のセッションに適用され、接続中の他のクライアントにも共有されます。",
+		LangSpanish:            "Los cambios se aplican a esta sesión y se comparten con los demás clientes conectados.",
+	},
 	MsgDefaultSettingsSaved: {
 		LangEnglish:            "New-thread defaults updated; attached thread unchanged.",
 		LangChinese:            "已更新新建 thread 的默认配置；已接入 thread 未更改。",
@@ -5319,6 +5340,9 @@ const (
 
 const (
 	MsgDefaultSettingsScope       MsgKey = "default_settings_settingsscope"
+	MsgSessionSettingsSaved       MsgKey = "session_settings_saved"
+	MsgSessionSettingsRuntime     MsgKey = "session_settings_runtime"
+	MsgSessionSettingsScope       MsgKey = "session_settings_scope"
 	MsgDefaultSettingsSaved       MsgKey = "default_settings_settingssaved"
 	MsgDefaultSettingsRuntime     MsgKey = "default_settings_settingsruntime"
 	MsgDefaultSettingsConfigured  MsgKey = "default_settings_settingsconfigured"

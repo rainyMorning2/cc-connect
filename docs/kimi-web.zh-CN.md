@@ -40,8 +40,9 @@ busy_message_mode = "queue" # 改为 "steer" 开启忙碌时普通文字自动�
 
 省略 `backend` 或使用 `backend = "exec"` 时继续使用原来的 CLI 接入。
 `web` 后端无需通过 PATH 找到 `kimi`，也不会调用 CLI。
-模型、权限、Provider 在 Kimi 服务或浏览器中配置；此后端不接受
-`model`、`mode`、`provider`、`env`、`timeout_mins` 覆盖。
+Provider、权限在 Kimi 服务或浏览器中配置；此后端不接受
+`mode`、`provider`、`env`、`timeout_mins` 覆盖。
+可用 `model`、`reasoning_effort` 设置 CC-Connect 新会话的默认值；省略时跟随服务默认值。
 
 `busy_message_mode` 与 Codex 托管后端使用同一参数名，默认 `"queue"`，可选 `"steer"`。
 旧名 `web_busy_message_mode` 不再接受，需要修改配置。
@@ -62,6 +63,8 @@ busy_message_mode = "queue" # 改为 "steer" 开启忙碌时普通文字自动�
 | 普通消息 | 使用同一服务提交 prompt；忙碌时按 `busy_message_mode` 排队或自动 steer |
 | `/new` 后发送消息 | `web_attach_only = false` 时可新建服务端会话；默认值为 false |
 | `/history` | 读取服务端历史，包含其他客户端发起的对话 |
+| `/model` | 已接入时查看或修改当前会话模型；未接入时选择新会话默认模型 |
+| `/effort`、`/reasoning` | 已接入时查看或修改当前会话思考强度；未接入时选择新会话默认强度 |
 | `/stop` | 按当前 prompt ID 停止执行；旧轮次的停止请求不会取消新轮次 |
 | 审批和问答 | 支持批准、会话级批准、拒绝、取消，以及结构化问题回答 |
 | `/steer <文本>` | 尽力将指令插入服务处理请求时正在执行的轮次，不锁定原轮次 |
@@ -73,15 +76,21 @@ busy_message_mode = "queue" # 改为 "steer" 开启忙碌时普通文字自动�
 跟踪结果，不会因为浏览器先开始新轮次而重复提交本端消息。
 
 从 exec 后端切换到 web 后端时，本地保存的活动会话可能属于另一个工作目录。
-此时直接发送消息会被目录校验拒绝，不会自动另建会话或跨目录接入。
-先用 `/dir <旧会话所在路径>` 切换目录，再用 `/list`、`/attach <会话ID或序号>`
-恢复原会话；如需在当前目录开始新对话，使用 `/new` 后发送消息。
+默认模式下，直接发送消息会清理确认已不存在或属于其他目录的旧绑定，并在当前目录
+自动新建会话；原会话仍保留在服务端。鉴权、网络及临时服务错误不会触发此回退。
+`web_attach_only = true` 时仍须显式接入。显式 `/attach`、`/switch` 始终严格校验目录。
+如需恢复其他目录的原会话，先用 `/dir <旧会话所在路径>`，再用 `/list`、`/attach <会话ID或序号>`。
 `/list` 只显示当前目录；对于服务返回零消息计数的旧会话，会从历史补充计数和缺失的标题。
 
 回复底部与其他后端共用核心渲染逻辑。接入和重连时，通过服务的 `/status` 接口
 读取当前模型、思考强度、上下文占用和容量；状态查询失败时保留快照提供的数据。
 运行中由主 agent 的 `agent.status.updated` 事件更新这些字段及本轮 token 用量，无需每轮额外查询。
 所有值均来自服务；未提供的字段会省略，会话累计 token 不会当成本轮用量显示。
+
+`/model switch <序号或模型名>`、`/effort <序号或强度名>` 的选项来自服务的模型目录，
+思考强度按当前选择的模型提供，不硬编码档位，支持带空格的强度名。
+已接入时修改服务端当前会话 profile，Web 和其他客户端可见相同设置，不关闭观察连接或清空历史；
+未接入时只修改 CC-Connect 的新会话默认值，不修改 Kimi 的全局配置。
 
 ## 恢复与范围
 
@@ -110,7 +119,7 @@ busy_message_mode = "queue" # 改为 "steer" 开启忙碌时普通文字自动�
 一旦尝试提交 prompt，网络错误也可能代表服务已接收，因此不会擅自删除可能被会话引用的附件。
 成功提交的文件由 Kimi 服务管理，不在本端完成轮次时删除。具体格式的解析能力由 Kimi 的模型和工具决定。
 
-本版不提供后台终端控制、服务端删除会话和聊天端模型/权限切换；这些操作可在 Kimi Web 中执行。
+本版不提供后台终端控制、服务端删除会话和聊天端权限切换；这些操作可在 Kimi Web 中执行。
 
 官方协议仍是实验性接口；升级 Kimi 后以该服务的 `/openapi.json`、`/asyncapi.json` 为准。
 参考：[Kimi Server API](https://www.kimi.com/code/docs/en/kimi-code-cli/reference/server-api.html)。

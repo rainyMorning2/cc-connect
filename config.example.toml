@@ -2301,14 +2301,17 @@ app_secret = "your-feishu-app-secret"
 # [projects.agent.options]
 # backend = "exec" # default; use "web" for a shared Kimi Code 2.2 service
 # 新版 Kimi Web 共享会话（与浏览器同时接入）：docs/kimi-web.zh-CN.md
-# For backend = "web", configure model/permissions/providers in Kimi Web.
+# For backend = "web", configure permissions/providers in Kimi Web.
+# /model and /effort update an attached session; otherwise select new-session defaults.
 # web_url = "http://127.0.0.1:58627"
 # web_token_file = "/home/your-user/.kimi-code/server.token"
 # web_attach_only = true # require /attach or /switch; default false allows new sessions
+# model = "your-provider/your-model" # optional web new-session default
+# reasoning_effort = "high" # optional web new-session default; choices come from the service
 # busy_message_mode = "queue" # "steer": auto-steer plain text while busy; media stays queued
 # 忙碌时默认排队；设为 "steer" 自动插入普通文字，图片和文件仍排队。
-# The following CLI-only model/mode/env settings must be omitted for backend="web".
 # work_dir = "/path/to/project"
+# The following mode/cmd/timeout settings only apply to the exec backend.
 # mode = "default"  # "default" | "yolo" | "plan" | "quiet"
 # cmd = "kimi"      # CLI binary name (default: "kimi") / CLI 二进制名称（默认 "kimi"）
 # timeout_mins = 30  # 每次对话超时时间（分钟），0 表示不限制
