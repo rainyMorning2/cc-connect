@@ -47,6 +47,12 @@ daemon_enable_delete = true
 
 托管模式不接受 `env` 和 `app_server_url`；凭据、Provider 和进程环境需要在 daemon 中配置。接入已有 thread 时，该 thread 自身的 model、Provider、审批策略和 sandbox 设置会保留；`model`、`mode`、`reasoning_effort`、`provider` 只用于新建 thread。
 
+已接入后，`/model` 和 `/effort`（或 `/reasoning`）命令直接查看、修改当前 thread 的模型和推理强度；
+未接入时设置新建 thread 的默认值。当前模型和对应的 effort 选项从 daemon 的 `model/list` 获取。
+切换使用 `thread/settings/update`，只发送所选字段，并读取服务端设置确认；不重建 thread、断开连接或清空历史，
+也不改变新建默认值。与该 thread 连接的 CLI、IDE 等其他客户端会看到相同设置。
+当前轮次或待处理审批尚未结束时拒绝修改，请在空闲后重试。
+
 新建 thread 时，省略 `mode`、设为空字符串或设为 `"default"` 会跟随 daemon 的有效权限默认值，包括 sandbox/权限 profile、审批策略和审批者；CC-Connect 不发送这些覆盖参数。只有显式设置 `mode`（例如 `suggest`、`full-auto`）时才应用 CC-Connect 的模式映射。`CODEX_HOME/config.toml` 是 Codex 的共享配置，并非 TUI 专用；daemon 使用其启动时选择的 `CODEX_HOME` 和配置层，CC-Connect 的 `codex_home` 不会重新配置已经运行的 daemon。
 
 ### 权限预设菜单
@@ -116,6 +122,8 @@ app_server_url = "stdio://"
 |---|---|
 | `/attach <id\|序号>` | 接入已有 Codex thread，并开始接收其输出。 |
 | `/detach` | 断开当前 thread 的观察和控制连接，thread 本身继续运行。 |
+| `/model [switch <序号或模型名>]` | 已接入时查看或修改当前 thread 的模型；未接入时选择新建默认模型。 |
+| `/effort [序号或强度名]` | 已接入时查看或修改当前 thread 的推理强度；未接入时选择新建默认值。`/reasoning` 为同义命令。 |
 | `/steer <文本>` | 向当前正在运行的 turn 注入新的文本指示。 |
 | `/terminals` | 列出当前 thread 创建的后台终端。 |
 | `/terminals list` | 同 `/terminals`，显式列出后台终端。 |

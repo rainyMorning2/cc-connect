@@ -46,6 +46,12 @@ daemon_enable_delete = true
 
 Managed mode rejects `env` and `app_server_url`. Configure credentials, providers and process environment in the daemon. Attached threads retain their own model, provider, approval and sandbox settings; `model`, `mode`, `reasoning_effort` and `provider` configure new threads only.
 
+When attached, `/model` and `/effort` (or `/reasoning`) read and change the current thread's model and reasoning effort.
+Without an attached runtime, they select defaults for new threads. Models and model-specific effort options come from the daemon's `model/list`.
+Changes send only the selected field through `thread/settings/update` and read the settings back for confirmation.
+They preserve the thread, connection, history and creation defaults; other CLI and IDE clients sharing the thread see the same settings.
+Updates require an idle thread with no pending approvals.
+
 For new threads, omitting `mode`, setting it to an empty string or setting `mode = "default"` inherits the daemon's effective permission defaults, including its sandbox/permission profile, approval policy and reviewer. CC-Connect sends no overrides for these settings. An explicit `mode` such as `suggest` or `full-auto` still applies CC-Connect's mode mapping. `CODEX_HOME/config.toml` is shared Codex configuration, not a TUI-only file. The daemon uses the `CODEX_HOME` and configuration layers selected at its own startup; CC-Connect's `codex_home` does not reconfigure an already-running daemon.
 
 ### Permission presets
@@ -116,6 +122,8 @@ These commands require the corresponding shared-session capabilities. `<id>` can
 |---|---|
 | `/attach <id\|index>` | Attach to an existing thread and receive live output. |
 | `/detach` | Disconnect this observer; the thread continues running. |
+| `/model [switch <index or model>]` | Read/change the attached thread's model, or select new-thread defaults when unattached. |
+| `/effort [index or effort]` | Read/change the attached thread's reasoning effort, or select new-thread defaults when unattached. `/reasoning` is an alias. |
 | `/steer <text>` | Inject text instructions into the active turn. |
 | `/terminals` or `/terminals list` | List background terminals created by this thread. |
 | `/terminals stop <id>` | Stop one background terminal. |
