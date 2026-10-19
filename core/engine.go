@@ -5603,10 +5603,16 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 			return richMarkdownResolver.ResolveRichCardMarkdown(e.ctx, markdown, final)
 		}
 		buildResolvedRichCard := func(status CardStatus, title string, steps []ToolStep, markdown string, streaming bool, statusFooter string) string {
+			steps = e.sharedSubagentSteps(state, event.TurnID, steps)
 			return richCardSupporter.BuildRichCard(status, title, steps, resolveRichCardMarkdown(markdown, !streaming), streaming, statusFooter)
 		}
 
 		switch event.Type {
+		case EventNotice:
+			if event.Notice != nil && event.Notice.Subagent != nil && hasRichCard {
+				toolSteps = e.sharedSubagentSteps(state, event.TurnID, toolSteps)
+				e.updateLiveToolCard(p, replyCtx, &cardMessageID, toolSteps, partialText, e.composeRichStatusFooter(true, turnStart, e.agent, state.agentSession, state.workspaceDir))
+			}
 		case EventToolOutput:
 			if !e.display.ToolMessages || event.Content == "" {
 				break
@@ -6520,8 +6526,9 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 					richStatusFooter = formatElapsed(time.Since(turnStart), false, e.i18n.currentLang()) + "\n" + legacyStatusFooter
 				}
 				finalBody := resolveRichCardMarkdown(parts[0], true)
+				toolSteps = e.sharedSubagentSteps(state, event.TurnID, toolSteps)
 				finalCard := richCardSupporter.BuildRichCard(CardStatusDone, "", toolSteps, finalBody, false, richStatusFooter)
-				sentLatest := approvalAfterRichCard && strings.TrimSpace(finalBody) != "" && e.sendLatestRichFinal(p, replyCtx, cardMessageID, finalCard, richCardSupporter)
+				sentLatest := approvalAfterRichCard && !hasSubagentSteps(toolSteps) && strings.TrimSpace(finalBody) != "" && e.sendLatestRichFinal(p, replyCtx, cardMessageID, finalCard, richCardSupporter)
 				if !sentLatest && cardMessageID != nil {
 					// Forced final flush via cardkit-v1 streaming text update before
 					// flipping status to Done via full-card Patch. The throttle in the
@@ -6537,17 +6544,24 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 					if updater, ok := p.(MessageUpdater); ok {
 						if err := updater.UpdateMessage(e.ctx, cardMessageID, finalCard); err != nil {
 							slog.Debug("rich card: final update failed, falling back to send", "platform", p.Name(), "error", err)
-							if err := p.Send(e.ctx, replyCtx, finalCard); err != nil {
-								slog.Error("failed to send rich card reply", "error", err)
+							var sendErr error
+							cardMessageID, sendErr = e.sendRetainedRichCard(state, p, replyCtx, finalCard)
+							if sendErr != nil {
+								slog.Error("failed to send rich card reply", "error", sendErr)
 								return
 							}
 						}
 					}
 				} else if !sentLatest {
-					if err := p.Send(e.ctx, replyCtx, finalCard); err != nil {
+					var err error
+					cardMessageID, err = e.sendRetainedRichCard(state, p, replyCtx, finalCard)
+					if err != nil {
 						slog.Error("failed to send rich card reply", "error", err)
 						return
 					}
+				}
+				if !sentLatest {
+					e.retainSubagentMainCard(state, event.TurnID, subagentFinalCard{platform: p, handle: cardMessageID, steps: toolSteps, markdown: finalBody, footer: richStatusFooter, status: CardStatusDone})
 				}
 				for _, overflow := range parts[1:] {
 					overflowBody := resolveRichCardMarkdown(overflow, true)
@@ -6825,10 +6839,15 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 			state.eventsNeedResync = true
 			state.mu.Unlock()
 			if hasRichCard && cardMessageID != nil {
-				errCard := buildResolvedRichCard(CardStatusError, "", toolSteps, partialText, false, e.composeRichStatusFooter(false, turnStart, e.agent, state.agentSession, state.workspaceDir))
+				toolSteps = e.sharedSubagentSteps(state, event.TurnID, toolSteps)
+				errorFooter := e.composeRichStatusFooter(false, turnStart, e.agent, state.agentSession, state.workspaceDir)
+				errorBody := resolveRichCardMarkdown(partialText, true)
+				errCard := richCardSupporter.BuildRichCard(CardStatusError, "", toolSteps, errorBody, false, errorFooter)
 				if updater, ok := p.(MessageUpdater); ok {
 					if err := updater.UpdateMessage(e.ctx, cardMessageID, errCard); err != nil {
 						slog.Debug("rich card: failed to update error card", "platform", p.Name(), "error", err)
+					} else {
+						e.retainSubagentMainCard(state, event.TurnID, subagentFinalCard{platform: p, handle: cardMessageID, steps: toolSteps, markdown: errorBody, footer: errorFooter, status: CardStatusError})
 					}
 				}
 			}
@@ -7870,6 +7889,18 @@ func (e *Engine) cmdSwitch(p Platform, msg *Message, args []string) {
 //  5. Summary substring match (case-insensitive)
 func (e *Engine) matchSession(sessions []AgentSessionInfo, manager *SessionManager, query string) *AgentSessionInfo {
 	if len(sessions) == 0 {
+		return nil
+	}
+
+	// Card callbacks bind a complete ID from the displayed row. Never fall
+	// through to a prefix/name match if that session has since disappeared.
+	if strings.HasPrefix(query, "--id ") {
+		id := strings.TrimPrefix(query, "--id ")
+		for i := range sessions {
+			if sessions[i].ID == id {
+				return &sessions[i]
+			}
+		}
 		return nil
 	}
 
@@ -14166,7 +14197,7 @@ func (e *Engine) renderListCard(sessionKey string, page int) (*Card, error) {
 			e.i18n.Tf(MsgListItem, marker, i+1, displayName, s.MessageCount, s.ModifiedAt.Format("01-02 15:04")),
 			fmt.Sprintf("#%d", i+1),
 			btnType,
-			fmt.Sprintf("act:/switch %d", i+1),
+			fmt.Sprintf("act:/switch --id %s", s.ID),
 		)
 	}
 

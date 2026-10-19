@@ -532,6 +532,7 @@ type AgentSessionInfo struct {
 
 // SubagentNotice describes a child agent independently of the main reply.
 type SubagentNotice struct {
+	TurnID                               string // owning parent turn, retained across child lifecycle updates
 	ID, Name, TaskID, Description, Model string
 	Status, Detail                       string
 }

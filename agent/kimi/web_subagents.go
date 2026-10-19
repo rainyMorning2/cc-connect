@@ -54,6 +54,12 @@ func (s *webSession) emitSubagent(update core.SubagentNotice) {
 		s.subagents = map[string]core.SubagentNotice{}
 	}
 	previous, exists := s.subagents[update.ID]
+	update.TurnID = previous.TurnID
+	if update.TurnID == "" {
+		s.mu.Lock()
+		update.TurnID = s.turn
+		s.mu.Unlock()
+	}
 	if update.Name == "" {
 		update.Name = previous.Name
 	}

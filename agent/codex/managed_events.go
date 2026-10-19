@@ -160,6 +160,9 @@ func (s *managedSession) handleItem(m daemonMessage) error {
 	kind, _ := p.Item["type"].(string)
 	if kind == "collabAgentToolCall" {
 		for _, n := range s.collabUpdates(p.Item, s.subagents) {
+			if n.TurnID == "" {
+				n.TurnID = p.TurnID
+			}
 			s.emitSubagent(n)
 		}
 		return nil

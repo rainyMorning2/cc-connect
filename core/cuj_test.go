@@ -3104,6 +3104,7 @@ func TestCUJ_C7_SharedToolSendFollowsAttachmentAndStopsAfterDetach(t *testing.T)
 // CUJ: live selection begins observing immediately; failed attachment and
 // failed interruption preserve the current session and its event reader.
 func TestCUJ_B13_SharedSwitchAndControlFailurePreserveObserver(t *testing.T) {
+	t.Run("session list selection survives server reordering", runStableSharedSessionListJourney)
 	t.Run("text command", func(t *testing.T) {
 		env := newSharedTestEnv(t)
 		env.a.failInterrupt = true
@@ -3437,6 +3438,7 @@ func TestCUJ_C7_SharedAsyncQuestionCardSteersWhileWorking(t *testing.T) {
 }
 
 func TestCUJ_C7_SharedRuntimeNoticeDoesNotEndTask(t *testing.T) {
+	t.Run("subagents update original parent card even after completion", runSubagentInlineJourney)
 	t.Run("subagent lifecycle preserves main conversation", func(t *testing.T) {
 		env := newSharedTestEnv(t)
 		env.send("/attach first")

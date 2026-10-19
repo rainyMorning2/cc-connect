@@ -201,11 +201,13 @@ silently change the meaning of an existing button.
 ### Subagent status cards
 
 The managed daemon backend maps parent-thread `collabAgentToolCall` items to the
-same per-child cards used by Kimi. Cards show the child ID, status, and available
+same per-child panels inside the main reply card used by Kimi. Panels show the child ID, status, and available
 task, model, and result details. A child thread ID is used when no name is supplied.
 Platforms with editable cards update each original card; normal states are
 collapsed, while failures and interruptions are expanded. Other platforms receive
-ordinary notices. Child state never completes the parent reply.
+ordinary notices. Late child updates edit the original finalized reply without
+changing the next turn. When no parent card is available (such as attaching to
+historical work), independent cards or notices are used. Child state never completes the parent reply.
 
 Status comes from `agentsStates`: completing a `wait` call does not imply that its
 children completed. Attachment and reconnection fold historical items into their
@@ -217,3 +219,7 @@ this feature does not automatically spawn agents or cover legacy stdio/exec back
 Subagent cards keep a short preview visible outside the details panel: the task
 while running, then the result or reason when available. Only the first nonempty
 line is shown, limited to 48 characters; full text remains in the details.
+
+Session-list buttons bind the complete thread ID, so server-side reordering does
+not change their target. Missing targets never fall back to prefix/name matches.
+Run `/list` again after upgrading; old cards still carry index-based actions.

@@ -6635,7 +6635,7 @@ func TestRenderListCard_MakesEveryVisibleSessionClickable(t *testing.T) {
 		t.Fatalf("switch action count = %d, want %d", got, len(sessions))
 	}
 
-	btn, ok := findCardAction(card, "act:/switch 6")
+	btn, ok := findCardAction(card, "act:/switch --id "+sessions[5].ID)
 	if !ok {
 		t.Fatal("expected active session switch action to exist")
 	}

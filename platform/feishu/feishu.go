@@ -7207,6 +7207,9 @@ func buildCardJSONWithStatus(content string, status core.CardStatus) string {
 
 func splitRichStepsByLane(steps []core.ToolStep) (reasoning []core.ToolStep, tools []core.ToolStep) {
 	for _, step := range steps {
+		if step.Kind == core.ToolStepKindSubagent {
+			continue
+		}
 		if step.Kind == core.ToolStepKindThinking {
 			reasoning = append(reasoning, step)
 			continue
@@ -7423,6 +7426,18 @@ func buildRichCardJSONBytes(status core.CardStatus, steps []core.ToolStep, markd
 		))
 		activityElements = append(activityElements, richToolPreviewElement(toolSteps[len(toolSteps)-1]))
 	}
+	for _, step := range steps {
+		if step.Kind != core.ToolStepKindSubagent {
+			continue
+		}
+		expanded := step.Status == "failed" || step.Status == "suspended"
+		activityElements = append(activityElements, buildRichPanel(step.Name, expanded, []map[string]any{
+			{"tag": "div", "text": map[string]any{"tag": "plain_text", "content": step.Summary}},
+		}))
+		if step.ResultTail != "" {
+			activityElements = append(activityElements, map[string]any{"tag": "div", "text": map[string]any{"tag": "plain_text", "content": step.ResultTail, "text_size": "notation"}})
+		}
+	}
 	if len(activityElements) == 0 && streaming {
 		activityElements = append(activityElements, buildRichPanel("Reasoning", true, richPanelElements(nil, "Thinking...")))
 	}
@@ -7501,9 +7516,15 @@ func compactRichStepsForCardSize(steps []core.ToolStep, perLaneLimit, textLimit 
 	kept := make([]core.ToolStep, 0, min(len(steps), perLaneLimit*2))
 	reasoning := 0
 	tools := 0
+	children := 0
 	for i := len(steps) - 1; i >= 0; i-- {
 		step := steps[i]
-		if step.Kind == core.ToolStepKindThinking {
+		if step.Kind == core.ToolStepKindSubagent {
+			if children >= perLaneLimit {
+				continue
+			}
+			children++
+		} else if step.Kind == core.ToolStepKindThinking {
 			if reasoning >= perLaneLimit {
 				continue
 			}

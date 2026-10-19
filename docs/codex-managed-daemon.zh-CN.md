@@ -205,10 +205,11 @@ daemon 退出后，CC-Connect 最多重试 `daemon_reconnect_attempts` 次连接
 
 ### 子 agent 展示
 
-managed daemon 后端将父 thread 的 `collabAgentToolCall` 同步为子 agent 独立卡片，
+managed daemon 后端将父 thread 的 `collabAgentToolCall` 同步为主回答卡片内的子 agent 折叠栏目，
 与 Kimi 使用同一种展示：标题显示标识和状态，详情包含服务端提供的任务、模型和结果。
 协议没有提供名称时使用子 thread ID。支持更新卡片的平台原位更新，正常状态折叠，
-失败或暂停展开；其他平台使用普通通知。子 agent 状态不会结束主回答。
+失败或暂停展开。主回答结束后的状态更新仍编辑原卡片，不会串入下一轮。
+缺少对应主卡片或平台不支持富卡片更新时，回退到独立卡片或普通通知。子 agent 状态不会结束主回答。
 
 状态取自 `agentsStates`，不会将 `wait` 工具调用完成误判为子 agent 完成。
 接入与重连时合并父 thread 历史中的最新状态，不重复播放中间状态或首次接入前已结束的任务。
@@ -217,3 +218,6 @@ managed daemon 后端将父 thread 的 `collabAgentToolCall` 同步为子 agent 
 
 子 agent 卡片提供一行常驻短预览：运行时显示任务首行，结束后优先显示结果或原因首行；
 最多 48 个字符，超长省略，完整内容保留在详情中。
+
+会话列表按钮绑定完整 thread ID，列表因更新时间重排后仍选择原会话；目标已消失时不回退匹配其他会话。
+升级前已发送的旧列表仍携带旧序号，请重新执行 `/list` 后点选。

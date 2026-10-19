@@ -59,6 +59,7 @@ type ToolStepKind string
 const (
 	ToolStepKindTool     ToolStepKind = "tool"
 	ToolStepKindThinking ToolStepKind = "thinking"
+	ToolStepKindSubagent ToolStepKind = "subagent"
 )
 
 // ToolStep is one summarized progress row shown in rich progress cards.

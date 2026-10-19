@@ -140,6 +140,9 @@ func (s *managedSession) reconcileSubagents(turns []managedTurn) {
 	for _, turn := range turns {
 		for _, item := range turn.Items {
 			for _, n := range s.collabUpdates(item, latest) {
+				if n.TurnID == "" {
+					n.TurnID = turn.ID
+				}
 				if _, exists := latest[n.ID]; !exists {
 					order = append(order, n.ID)
 				}

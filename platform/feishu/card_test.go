@@ -547,3 +547,45 @@ func TestRenderCard_PreviewRemainsVisibleOutsideCollapsedDetails(t *testing.T) {
 		t.Fatal("fallback lost details")
 	}
 }
+
+func TestBuildRichCard_SubagentsInsideMainCardWithPreview(t *testing.T) {
+	steps := []core.ToolStep{
+		{Kind: core.ToolStepKindTool, Name: "Bash", Summary: "main tool"},
+		{Kind: core.ToolStepKindSubagent, Name: "Reviewer · Running", Summary: "FULL CHILD TASK", ResultTail: "SHORT TASK", Status: "running"},
+		{Kind: core.ToolStepKindSubagent, Name: "Tester · Failed", Summary: "FULL FAILURE", ResultTail: "SHORT FAILURE", Status: "failed"},
+	}
+	var card map[string]any
+	if err := json.Unmarshal([]byte(buildRichCard(core.CardStatusWorking, "", steps, "MAIN ANSWER", true, "FOOTER")), &card); err != nil {
+		t.Fatal(err)
+	}
+	els := card["body"].(map[string]any)["elements"].([]any)
+	panels := map[string]map[string]any{}
+	for _, raw := range els {
+		el := raw.(map[string]any)
+		if el["tag"] == "collapsible_panel" {
+			title := el["header"].(map[string]any)["title"].(map[string]any)["content"].(string)
+			panels[title] = el
+		}
+	}
+	if panels["Reviewer · Running"]["expanded"] != false || panels["Tester · Failed"]["expanded"] != true {
+		t.Fatalf("panels=%#v", panels)
+	}
+	if _, ok := panels["Tools (1)"]; !ok {
+		t.Fatal("children mixed into tools lane")
+	}
+	for _, want := range []string{"SHORT TASK", "SHORT FAILURE", "MAIN ANSWER", "FOOTER"} {
+		found := false
+		for _, raw := range els {
+			el := raw.(map[string]any)
+			if el["content"] == want {
+				found = true
+			}
+			if text, ok := el["text"].(map[string]any); ok && text["content"] == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("missing visible %q", want)
+		}
+	}
+}
