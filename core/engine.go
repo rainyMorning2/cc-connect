@@ -7803,7 +7803,7 @@ func (e *Engine) cmdList(p Platform, msg *Message, args []string) {
 				}
 			}
 			sb.WriteString(fmt.Sprintf("%s **%d.** %s · **%d** msgs · %s\n",
-				marker, i+1, displayName, s.MessageCount, s.ModifiedAt.Format("01-02 15:04")))
+				marker, i+1, displayName, s.MessageCount, s.ModifiedAt.Local().Format("01-02 15:04")))
 		}
 		if totalPages > 1 {
 			sb.WriteString(fmt.Sprintf(e.i18n.T(MsgListPageHint), page, totalPages))
@@ -13606,7 +13606,7 @@ func (e *Engine) renderDeleteModeSelectCard(sessionKey string, sessions *Session
 			btnType = "primary"
 		}
 		cb.ListItemBtn(
-			e.i18n.Tf(MsgListItem, marker, i+1, e.deleteSessionDisplayName(sessions, &s), s.MessageCount, s.ModifiedAt.Format("01-02 15:04")),
+			e.i18n.Tf(MsgListItem, marker, i+1, e.deleteSessionDisplayName(sessions, &s), s.MessageCount, s.ModifiedAt.Local().Format("01-02 15:04")),
 			btnText,
 			btnType,
 			action,
@@ -14194,7 +14194,7 @@ func (e *Engine) renderListCard(sessionKey string, page int) (*Card, error) {
 			btnType = "primary"
 		}
 		cb.ListItemBtn(
-			e.i18n.Tf(MsgListItem, marker, i+1, displayName, s.MessageCount, s.ModifiedAt.Format("01-02 15:04")),
+			e.i18n.Tf(MsgListItem, marker, i+1, displayName, s.MessageCount, s.ModifiedAt.Local().Format("01-02 15:04")),
 			fmt.Sprintf("#%d", i+1),
 			btnType,
 			fmt.Sprintf("act:/switch --id %s", s.ID),

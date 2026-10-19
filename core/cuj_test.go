@@ -1433,6 +1433,32 @@ func TestCUJ_B1_NewCreatesIndependentSession(t *testing.T) {
 
 // CUJ-B2 · /list shows all sessions for the user.
 func TestCUJ_B2_ListShowsAllSessions(t *testing.T) {
+	t.Run("UTC session timestamps display in local time after switching", func(t *testing.T) {
+		previous := time.Local
+		time.Local = time.FixedZone("UTC+8", 8*60*60)
+		defer func() { time.Local = previous }()
+
+		env := newCUJEnv(t)
+		defer env.engine.Stop()
+		env.engine.agent = &stubListAgent{sessions: []AgentSessionInfo{{
+			ID: "utc-session", Summary: "UTC session", MessageCount: 3,
+			ModifiedAt: time.Date(2026, 10, 19, 18, 23, 0, 0, time.UTC),
+		}}}
+		for _, command := range []string{"/list", "/switch utc-session", "/list"} {
+			env.plat.clearSent()
+			env.userSends("timezone", command)
+			if command == "/list" {
+				visible := strings.Join(env.plat.getSent(), "\n")
+				if !strings.Contains(visible, "UTC session") || !strings.Contains(visible, "10-20 02:23") {
+					t.Fatalf("list must show session time in UTC+8: %s", visible)
+				}
+			}
+		}
+		if visible := strings.Join(env.plat.getSent(), "\n"); !strings.Contains(visible, "▶") {
+			t.Fatalf("switched session should be marked active: %s", visible)
+		}
+	})
+
 	env := newCUJEnv(t)
 	key := "test:b2"
 	env.userSends("b2", "hi")
