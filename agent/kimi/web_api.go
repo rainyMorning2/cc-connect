@@ -107,7 +107,11 @@ type webRecord struct {
 	MessageCount   int             `json:"message_count"`
 	CurrentPrompt  string          `json:"current_prompt_id"`
 	MainTurnActive bool            `json:"main_turn_active"`
-	Metadata       struct {
+	Usage          struct {
+		ContextTokens int `json:"context_tokens"`
+		ContextLimit  int `json:"context_limit"`
+	} `json:"usage"`
+	Metadata struct {
 		Cwd string `json:"cwd"`
 	} `json:"metadata"`
 }

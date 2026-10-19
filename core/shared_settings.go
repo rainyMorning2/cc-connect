@@ -26,6 +26,10 @@ func (e *Engine) handleDefaultSettingsCommand(p Platform, msg *Message, command 
 	if err != nil || !defaultSettingsOnly(agent) {
 		return false
 	}
+	if card := e.currentSessionSettingsCard(msg.SessionKey, command, args); card != nil {
+		e.replySettingsCard(p, msg, card)
+		return true
+	}
 	if command == "mode" && len(args) > 0 && strings.EqualFold(args[0], "current") {
 		e.cmdCurrentPermissionMode(p, msg, key, args[1:])
 		return true
@@ -142,17 +146,18 @@ func (e *Engine) applyDefaultReasoning(agent Agent, args []string) (bool, error)
 		return false, fmt.Errorf("%s", e.i18n.T(MsgReasoningNotSupported))
 	}
 	efforts := switcher.AvailableReasoningEfforts()
-	target := strings.ToLower(strings.TrimSpace(args[0]))
+	target := strings.ToLower(strings.TrimSpace(strings.Join(args, " ")))
 	if n, err := strconv.Atoi(target); err == nil && n >= 1 && n <= len(efforts) {
 		target = efforts[n-1]
 	}
 	valid := false
 	for _, effort := range efforts {
-		if target == effort {
+		if strings.EqualFold(target, effort) {
+			target = effort
 			valid = true
 		}
 	}
-	if len(args) != 1 || !valid {
+	if !valid {
 		return false, fmt.Errorf("%s", e.reasoningUsage(efforts))
 	}
 	switcher.SetReasoningEffort(target)
@@ -277,6 +282,9 @@ func (e *Engine) defaultSettingsSummary(agent Agent, sessionKey string) string {
 }
 
 func (e *Engine) renderDefaultSettingsCard(agent Agent, sessionKey, command string) *Card {
+	if card := e.currentSessionSettingsCard(sessionKey, command, nil); card != nil {
+		return card
+	}
 	title := map[string]MsgKey{"model": MsgCardTitleModel, "reasoning": MsgCardTitleReasoning, "mode": MsgCardTitleMode, "provider": MsgCardTitleProvider}[command]
 	card := NewCard().Title(e.i18n.T(title), "indigo").Markdown(e.defaultSettingsSummary(agent, sessionKey))
 	opts := []CardSelectOption{}
@@ -295,7 +303,7 @@ func (e *Engine) renderDefaultSettingsCard(agent Agent, sessionKey, command stri
 				}
 			}
 			for i, m := range models {
-				action := fmt.Sprintf("act:/model switch %d", i+1)
+				action := "act:/model switch " + m.Name
 				opts = append(opts, CardSelectOption{Text: fmt.Sprintf("%d. %s", i+1, m.Name), Value: action})
 				if m.Name == current {
 					selected = action
@@ -306,7 +314,7 @@ func (e *Engine) renderDefaultSettingsCard(agent Agent, sessionKey, command stri
 	case "reasoning":
 		if sw, ok := agent.(ReasoningEffortSwitcher); ok {
 			for i, effort := range sw.AvailableReasoningEfforts() {
-				action := fmt.Sprintf("act:/reasoning %d", i+1)
+				action := "act:/reasoning " + effort
 				opts = append(opts, CardSelectOption{Text: fmt.Sprintf("%d. %s", i+1, effort), Value: action})
 				if effort == sw.GetReasoningEffort() {
 					selected = action
@@ -377,6 +385,9 @@ func (e *Engine) defaultSettingsCardAction(command, args, sessionKey string) *Ca
 		return nil
 	}
 	command = strings.TrimPrefix(command, "/")
+	if card := e.currentSessionSettingsCard(sessionKey, command, strings.Fields(args)); card != nil {
+		return card
+	}
 	changed, err := e.applyDefaultSetting(agent, sessionKey, e.interactiveKeyForSessionKey(sessionKey), command, strings.Fields(args))
 	card := e.renderDefaultSettingsCard(agent, sessionKey, command)
 	if err != nil {

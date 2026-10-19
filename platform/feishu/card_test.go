@@ -526,3 +526,66 @@ func TestTrackedPermissionCard_RejectsInvalidHandle(t *testing.T) {
 		t.Fatal("accepted a handle that was not returned by tracked send")
 	}
 }
+
+func TestRenderCard_PreviewRemainsVisibleOutsideCollapsedDetails(t *testing.T) {
+	card := core.NewCard().RichMarkdown().CollapsedDetails("Child · running").Markdown("FULL TASK AND RESULT").Build()
+	card.PreviewText = "检查 <module> **原文**"
+	got := decodeRenderedCard(t, card)
+	els := got["body"].(map[string]any)["elements"].([]any)
+	if len(els) != 2 {
+		t.Fatalf("body=%#v", els)
+	}
+	panel := els[0].(map[string]any)
+	if panel["tag"] != "collapsible_panel" || panel["expanded"] != false {
+		t.Fatalf("panel=%#v", panel)
+	}
+	preview := els[1].(map[string]any)["text"].(map[string]any)
+	if preview["tag"] != "plain_text" || preview["content"] != card.PreviewText || preview["text_size"] != "notation" {
+		t.Fatalf("preview=%#v", preview)
+	}
+	if !strings.Contains(card.RenderText(), "FULL TASK AND RESULT") {
+		t.Fatal("fallback lost details")
+	}
+}
+
+func TestBuildRichCard_SubagentsInsideMainCardWithPreview(t *testing.T) {
+	steps := []core.ToolStep{
+		{Kind: core.ToolStepKindTool, Name: "Bash", Summary: "main tool"},
+		{Kind: core.ToolStepKindSubagent, Name: "Reviewer · Running", Summary: "FULL CHILD TASK", ResultTail: "SHORT TASK", Status: "running"},
+		{Kind: core.ToolStepKindSubagent, Name: "Tester · Failed", Summary: "FULL FAILURE", ResultTail: "SHORT FAILURE", Status: "failed"},
+	}
+	var card map[string]any
+	if err := json.Unmarshal([]byte(buildRichCard(core.CardStatusWorking, "", steps, "MAIN ANSWER", true, "FOOTER")), &card); err != nil {
+		t.Fatal(err)
+	}
+	els := card["body"].(map[string]any)["elements"].([]any)
+	panels := map[string]map[string]any{}
+	for _, raw := range els {
+		el := raw.(map[string]any)
+		if el["tag"] == "collapsible_panel" {
+			title := el["header"].(map[string]any)["title"].(map[string]any)["content"].(string)
+			panels[title] = el
+		}
+	}
+	if panels["Reviewer · Running"]["expanded"] != false || panels["Tester · Failed"]["expanded"] != true {
+		t.Fatalf("panels=%#v", panels)
+	}
+	if _, ok := panels["Tools (1)"]; !ok {
+		t.Fatal("children mixed into tools lane")
+	}
+	for _, want := range []string{"SHORT TASK", "SHORT FAILURE", "MAIN ANSWER", "FOOTER"} {
+		found := false
+		for _, raw := range els {
+			el := raw.(map[string]any)
+			if el["content"] == want {
+				found = true
+			}
+			if text, ok := el["text"].(map[string]any); ok && text["content"] == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("missing visible %q", want)
+		}
+	}
+}

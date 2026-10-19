@@ -40,6 +40,15 @@ func (s *webSession) handleFrame(f webFrame) error {
 	if !f.Volatile && f.Seq > 0 && f.Seq <= s.seq {
 		return nil
 	}
+	if strings.HasPrefix(f.Type, "subagent.") {
+		if err := s.handleSubagentFrame(f); err != nil {
+			return err
+		}
+		if !f.Volatile && f.Seq > s.seq {
+			s.seq = f.Seq
+		}
+		return nil
+	}
 	var p webEventPayload
 	if err := json.Unmarshal(f.Payload, &p); err != nil {
 		return fmt.Errorf("kimi web: event payload: %w", err)
@@ -49,6 +58,11 @@ func (s *webSession) handleFrame(f webFrame) error {
 			s.seq = f.Seq
 		}
 		return nil
+	}
+	if f.Type == "agent.status.updated" {
+		if err := s.updateStatus(f.Payload); err != nil {
+			return err
+		}
 	}
 	key := s.turnKeys[p.TurnID]
 	if f.Type == "turn.started" {
@@ -60,6 +74,8 @@ func (s *webSession) handleFrame(f webFrame) error {
 		if !s.completed[key] {
 			s.mu.Lock()
 			s.turn, s.prompt = key, p.PromptID
+			s.usage.InputTokens, s.usage.OutputTokens = 0, 0
+			s.usage.CachedInputTokens, s.usage.CacheCreationInputTokens = 0, 0
 			own := s.own[key]
 			s.mu.Unlock()
 			s.emit(core.Event{Type: core.EventTurnStarted, TurnID: key})
@@ -190,11 +206,17 @@ func (s *webSession) finishTurn(key, reason string) error {
 	}
 	delete(s.own, key)
 	delete(s.submitted, key)
+	usage := s.usage
 	s.mu.Unlock()
 	status := reason
 	if reason == "cancelled" {
 		status = "interrupted"
 	}
-	s.emit(core.Event{Type: core.EventResult, TurnID: key, Content: text, Done: true, Metadata: map[string]any{"turn_status": status}})
+	s.emit(core.Event{
+		Type: core.EventResult, TurnID: key, Content: text, Done: true,
+		InputTokens: usage.InputTokens, OutputTokens: usage.OutputTokens,
+		CacheReadInputTokens: usage.CachedInputTokens, CacheCreationInputTokens: usage.CacheCreationInputTokens,
+		Metadata: map[string]any{"turn_status": status},
+	})
 	return nil
 }

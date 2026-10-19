@@ -71,7 +71,12 @@ func (e *Engine) renderCurrentPermissionModeCard(modes, approvals []PermissionMo
 		}
 		return s
 	}
-	sb.WriteString(e.i18n.Tf(MsgCurrentModeState, value(settings.PermissionProfile), value(settings.ApprovalPolicy), value(settings.ApprovalsReviewer), value(settings.Sandbox)))
+	if settings.PermissionMode != "" {
+		sb.WriteString(e.i18n.Tf(MsgCurrentNativeModeState, settings.PermissionMode))
+	} else {
+		sb.WriteString(e.i18n.Tf(MsgCurrentModeState, value(settings.PermissionProfile), value(settings.ApprovalPolicy), value(settings.ApprovalsReviewer), value(settings.Sandbox)))
+	}
+	selectedMode := ""
 	var options []CardSelectOption
 	for _, mode := range modes {
 		label := mode.Name
@@ -83,10 +88,13 @@ func (e *Engine) renderCurrentPermissionModeCard(modes, approvals []PermissionMo
 		}
 		fmt.Fprintf(&sb, "\n%s: %s", mode.Key, label)
 		options = append(options, CardSelectOption{Text: label, Value: "act:/mode current " + mode.Key})
+		if mode.Key == settings.PermissionMode {
+			selectedMode = "act:/mode current " + mode.Key
+		}
 	}
 	sb.WriteString("\n" + e.i18n.T(MsgCurrentModeUsage))
 	card := NewCard().Title(e.i18n.T(MsgCurrentModeTitle), "indigo").Markdown(sb.String()).
-		Select(e.i18n.T(MsgPermissionPresets), options, "")
+		Select(e.i18n.T(MsgPermissionPresets), options, selectedMode)
 	if len(approvals) > 0 {
 		var approvalOptions []CardSelectOption
 		selected := ""
@@ -98,6 +106,9 @@ func (e *Engine) renderCurrentPermissionModeCard(modes, approvals []PermissionMo
 			}
 		}
 		card.Markdown(e.i18n.T(MsgApprovalOnlyHint)).Select(e.i18n.T(MsgApprovalOnlyTitle), approvalOptions, selected).Note(e.i18n.T(MsgApprovalOnlyUsage))
+	}
+	if settings.PermissionMode != "" {
+		return card.Note(e.i18n.T(MsgSessionSettingsScope)).Buttons(e.cardBackButton()).Build()
 	}
 	return card.Buttons(DefaultBtn(e.i18n.T(MsgModeDefaultsButton), "nav:/mode")).Build()
 }

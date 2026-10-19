@@ -3,6 +3,7 @@ package kimi
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,6 +19,8 @@ import (
 type webAgent struct {
 	api             *webAPI
 	workDir         string
+	model, effort   string // new-session defaults, guarded by mu
+	models          []webModel
 	attachOnly      bool
 	busyMessageMode string
 	mu              sync.Mutex
@@ -27,6 +30,7 @@ type webAgent struct {
 
 var _ core.AgentSessionAttacher = (*webAgent)(nil)
 var _ core.HistoryProvider = (*webAgent)(nil)
+var _ core.WorkDirSwitcher = (*webAgent)(nil)
 
 func newWebAgent(opts map[string]any) (core.Agent, error) {
 	readString := func(key, fallback string) (string, error) {
@@ -85,23 +89,48 @@ func newWebAgent(opts map[string]any) (core.Agent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("kimi web: %w", err)
 	}
-	for _, key := range []string{"env", "model", "mode", "provider", "timeout_mins"} {
+	for _, key := range []string{"env", "mode", "provider", "timeout_mins"} {
 		if _, ok := opts[key]; ok {
 			return nil, fmt.Errorf("kimi web: configure %s in the Kimi server; attached settings are preserved", key)
 		}
 	}
-	return &webAgent{api: &webAPI{base: strings.TrimRight(base, "/"), tokenFile: token, client: client}, workDir: workDir, attachOnly: attachOnly, busyMessageMode: busyMode, sessions: map[*webSession]struct{}{}}, nil
+	defaults := map[string]string{}
+	for _, key := range []string{"model", "reasoning_effort"} {
+		if raw, exists := opts[key]; exists {
+			value, ok := raw.(string)
+			if !ok {
+				return nil, fmt.Errorf("kimi web: %s must be a string", key)
+			}
+			defaults[key] = strings.TrimSpace(value)
+		}
+	}
+	return &webAgent{api: &webAPI{base: strings.TrimRight(base, "/"), tokenFile: token, client: client}, workDir: workDir, model: defaults["model"], effort: defaults["reasoning_effort"], attachOnly: attachOnly, busyMessageMode: busyMode, sessions: map[*webSession]struct{}{}}, nil
 }
 func (*webAgent) Name() string                  { return "kimi" }
 func (a *webAgent) AutoSteerBusyMessages() bool { return a.busyMessageMode == "steer" }
 func (*webAgent) QueueBusyMedia() bool          { return true }
-func (a *webAgent) GetWorkDir() string          { return a.workDir }
+func (a *webAgent) GetWorkDir() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.workDir
+}
+func (a *webAgent) SetWorkDir(dir string) {
+	a.mu.Lock()
+	a.workDir = dir
+	a.mu.Unlock()
+	slog.Info("kimi web: work_dir changed", "work_dir", dir)
+}
 func (a *webAgent) BaseOpts() map[string]any {
-	return map[string]any{"backend": "web", "web_url": a.api.base, "web_token_file": a.api.tokenFile, "web_attach_only": a.attachOnly, "busy_message_mode": a.busyMessageMode}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return map[string]any{"backend": "web", "web_url": a.api.base, "web_token_file": a.api.tokenFile, "web_attach_only": a.attachOnly, "busy_message_mode": a.busyMessageMode, "model": a.model, "reasoning_effort": a.effort}
 }
 func (a *webAgent) StartSession(ctx context.Context, id string) (core.AgentSession, error) {
+	a.mu.Lock()
+	workDir, model, effort := a.workDir, a.model, a.effort
+	a.mu.Unlock()
 	if id != "" && id != core.ContinueSession {
-		return a.AttachSession(ctx, id)
+		return a.attachSession(ctx, id, workDir)
 	}
 	if a.attachOnly {
 		return nil, fmt.Errorf("kimi web: select an existing session with /attach or /switch")
@@ -117,9 +146,19 @@ func (a *webAgent) StartSession(ctx context.Context, id string) (core.AgentSessi
 	if err := a.api.request(ctx, "GET", "/api/v1/config", nil, &config); err != nil {
 		return nil, err
 	}
-	body := map[string]any{"metadata": map[string]string{"cwd": a.workDir}}
-	if config.Model != "" {
-		body["agent_config"] = map[string]any{"model": config.Model}
+	body := map[string]any{"metadata": map[string]string{"cwd": workDir}}
+	if model == "" {
+		model = config.Model
+	}
+	agentConfig := map[string]any{}
+	if model != "" {
+		agentConfig["model"] = model
+	}
+	if effort != "" {
+		agentConfig["thinking"] = effort
+	}
+	if len(agentConfig) > 0 {
+		body["agent_config"] = agentConfig
 	}
 	var r webRecord
 	if err := a.api.request(ctx, "POST", "/api/v1/sessions", body, &r); err != nil {
@@ -128,13 +167,16 @@ func (a *webAgent) StartSession(ctx context.Context, id string) (core.AgentSessi
 	if r.ID == "" {
 		return nil, fmt.Errorf("kimi web: create returned no session ID")
 	}
-	return a.AttachSession(ctx, r.ID)
+	return a.attachSession(ctx, r.ID, workDir)
 }
 func (a *webAgent) AttachSession(ctx context.Context, id string) (core.AgentSession, error) {
+	return a.attachSession(ctx, id, a.GetWorkDir())
+}
+func (a *webAgent) attachSession(ctx context.Context, id, workDir string) (core.AgentSession, error) {
 	if id == "" || id == "." || id == ".." || strings.ContainsAny(id, "/\\?#") {
 		return nil, fmt.Errorf("kimi web: invalid session ID")
 	}
-	s, err := newWebSession(ctx, a, id)
+	s, err := newWebSession(ctx, a, id, workDir)
 	if err != nil {
 		return nil, err
 	}
@@ -162,6 +204,7 @@ func (a *webAgent) Stop() error {
 	return nil
 }
 func (a *webAgent) ListSessions(ctx context.Context) ([]core.AgentSessionInfo, error) {
+	workDir := a.GetWorkDir()
 	var result []core.AgentSessionInfo
 	after := ""
 	seen := map[string]bool{}
@@ -178,8 +221,8 @@ func (a *webAgent) ListSessions(ctx context.Context) ([]core.AgentSessionInfo, e
 			return nil, err
 		}
 		for _, r := range page.Items {
-			if filepath.Clean(r.Metadata.Cwd) == a.workDir {
-				result = append(result, core.AgentSessionInfo{ID: r.ID, Summary: r.Title, MessageCount: r.MessageCount, ModifiedAt: webTime(r.UpdatedAt)})
+			if filepath.Clean(r.Metadata.Cwd) == workDir {
+				result = append(result, a.sessionInfo(ctx, r))
 			}
 		}
 		if !page.HasMore || len(page.Items) == 0 {
@@ -192,6 +235,31 @@ func (a *webAgent) ListSessions(ctx context.Context) ([]core.AgentSessionInfo, e
 		seen[after] = true
 	}
 	return result, nil
+}
+
+// Imported Kimi sessions can have populated history while their cached title
+// and message_count are still empty. Read history rather than showing them as
+// empty conversations. Failure to enrich one entry must not hide other sessions.
+func (a *webAgent) sessionInfo(ctx context.Context, r webRecord) core.AgentSessionInfo {
+	info := core.AgentSessionInfo{ID: r.ID, Summary: r.Title, MessageCount: r.MessageCount, ModifiedAt: webTime(r.UpdatedAt)}
+	if r.MessageCount != 0 {
+		return info
+	}
+	history, err := a.GetSessionHistory(ctx, r.ID, 0)
+	if err != nil {
+		slog.Warn("kimi web: read session list history", "session_id", r.ID, "error", err)
+		return info
+	}
+	info.MessageCount = len(history)
+	if strings.TrimSpace(info.Summary) == "" {
+		for _, entry := range history {
+			if entry.Role == "user" {
+				info.Summary = entry.Content
+				break
+			}
+		}
+	}
+	return info
 }
 func (a *webAgent) messages(ctx context.Context, id string, limit int) ([]webMessage, error) {
 	var messages []webMessage

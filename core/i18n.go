@@ -251,6 +251,22 @@ const (
 	MsgCurrentModeReadFailed     MsgKey = "current_mode_read_failed"
 	MsgCurrentModeState          MsgKey = "current_mode_state"
 	MsgPermDefault               MsgKey = "permission_preset_default"
+	MsgSubagentTitle             MsgKey = "subagenttitle"
+	MsgSubagentQueued            MsgKey = "subagentqueued"
+	MsgSubagentRunning           MsgKey = "subagentrunning"
+	MsgSubagentSuspended         MsgKey = "subagentsuspended"
+	MsgSubagentCompleted         MsgKey = "subagentcompleted"
+	MsgSubagentFailed            MsgKey = "subagentfailed"
+	MsgSubagentCancelled         MsgKey = "subagentcancelled"
+	MsgSubagentState             MsgKey = "subagentstate"
+	MsgSubagentPanelIdentity     MsgKey = "subagentpanelidentity"
+	MsgSubagentPanelState        MsgKey = "subagentpanelstate"
+	MsgSubagentPanelTask         MsgKey = "subagentpaneltask"
+	MsgSubagentTask              MsgKey = "subagenttask"
+	MsgPermManual                MsgKey = "permission_manual"
+	MsgPermAuto                  MsgKey = "permission_auto"
+	MsgPermYolo                  MsgKey = "permission_yolo"
+	MsgCurrentNativeModeState    MsgKey = "current_native_permission_mode"
 	MsgPermAsk                   MsgKey = "permission_preset_ask"
 	MsgPermAutoReview            MsgKey = "permission_preset_auto_review"
 	MsgPermFullAccess            MsgKey = "permission_preset_full_access"
@@ -852,6 +868,118 @@ var messages = map[MsgKey]map[Language]string{
 		LangJapanese:           "現在のスレッドの権限（サーバーの設定）:\nプロファイル: %s · 承認: %s · 審査者: %s · サンドボックス: %s",
 		LangSpanish:            "Permisos del hilo actual (según el servidor):\nPerfil: %s · Aprobación: %s · Revisor: %s · Sandbox: %s",
 	},
+	MsgSubagentTitle: {
+		LangEnglish:            "Sub-agent activity",
+		LangChinese:            "子 agent 动态",
+		LangTraditionalChinese: "子 agent 動態",
+		LangJapanese:           "サブエージェントの動作",
+		LangSpanish:            "Actividad del subagente",
+	},
+	MsgSubagentQueued: {
+		LangEnglish:            "Queued",
+		LangChinese:            "等待启动",
+		LangTraditionalChinese: "等待啟動",
+		LangJapanese:           "待機中",
+		LangSpanish:            "En espera",
+	},
+	MsgSubagentRunning: {
+		LangEnglish:            "Running",
+		LangChinese:            "运行中",
+		LangTraditionalChinese: "執行中",
+		LangJapanese:           "実行中",
+		LangSpanish:            "En ejecución",
+	},
+	MsgSubagentSuspended: {
+		LangEnglish:            "Suspended",
+		LangChinese:            "已暂停",
+		LangTraditionalChinese: "已暫停",
+		LangJapanese:           "一時停止",
+		LangSpanish:            "Suspendido",
+	},
+	MsgSubagentCompleted: {
+		LangEnglish:            "Completed",
+		LangChinese:            "已完成",
+		LangTraditionalChinese: "已完成",
+		LangJapanese:           "完了",
+		LangSpanish:            "Completado",
+	},
+	MsgSubagentFailed: {
+		LangEnglish:            "Failed",
+		LangChinese:            "失败",
+		LangTraditionalChinese: "失敗",
+		LangJapanese:           "失敗",
+		LangSpanish:            "Fallido",
+	},
+	MsgSubagentCancelled: {
+		LangEnglish:            "Cancelled",
+		LangChinese:            "已取消",
+		LangTraditionalChinese: "已取消",
+		LangJapanese:           "キャンセル済み",
+		LangSpanish:            "Cancelado",
+	},
+	MsgSubagentPanelIdentity: {
+		LangEnglish:            "%s (%s)",
+		LangChinese:            "%s（%s）",
+		LangTraditionalChinese: "%s（%s）",
+		LangJapanese:           "%s（%s）",
+		LangSpanish:            "%s (%s)",
+	},
+	MsgSubagentPanelState: {
+		LangEnglish:            "%s %s",
+		LangChinese:            "%s %s",
+		LangTraditionalChinese: "%s %s",
+		LangJapanese:           "%s %s",
+		LangSpanish:            "%s %s",
+	},
+	MsgSubagentPanelTask: {
+		LangEnglish:            "%s %s · %s",
+		LangChinese:            "%s %s · %s",
+		LangTraditionalChinese: "%s %s · %s",
+		LangJapanese:           "%s %s · %s",
+		LangSpanish:            "%s %s · %s",
+	},
+	MsgSubagentState: {
+		LangEnglish:            "%s (%s): %s",
+		LangChinese:            "%s（%s）：%s",
+		LangTraditionalChinese: "%s（%s）：%s",
+		LangJapanese:           "%s（%s）: %s",
+		LangSpanish:            "%s (%s): %s",
+	},
+	MsgSubagentTask: {
+		LangEnglish:            "Task: %s",
+		LangChinese:            "任务：%s",
+		LangTraditionalChinese: "任務：%s",
+		LangJapanese:           "タスク: %s",
+		LangSpanish:            "Tarea: %s",
+	},
+	MsgPermManual: {
+		LangEnglish:            "Always Ask",
+		LangChinese:            "始终询问",
+		LangTraditionalChinese: "始終詢問",
+		LangJapanese:           "常に確認",
+		LangSpanish:            "Preguntar siempre",
+	},
+	MsgPermAuto: {
+		LangEnglish:            "Never Ask",
+		LangChinese:            "完全自动",
+		LangTraditionalChinese: "完全自動",
+		LangJapanese:           "確認せず自動実行",
+		LangSpanish:            "No preguntar nunca",
+	},
+	MsgPermYolo: {
+		LangEnglish:            "Ask When Needed",
+		LangChinese:            "必要时询问",
+		LangTraditionalChinese: "必要時詢問",
+		LangJapanese:           "必要なときに確認",
+		LangSpanish:            "Preguntar cuando sea necesario",
+	},
+	MsgCurrentNativeModeState: {
+		LangEnglish:            "Current session permissions (reported by server): %s",
+		LangChinese:            "当前会话权限（服务端返回）：%s",
+		LangTraditionalChinese: "目前會話權限（伺服器回傳）：%s",
+		LangJapanese:           "現在のセッションの権限（サーバーの設定）: %s",
+		LangSpanish:            "Permisos de la sesión actual (según el servidor): %s",
+	},
 	MsgPermDefault: {
 		LangEnglish:            "Follow daemon defaults",
 		LangChinese:            "跟随 daemon 默认配置",
@@ -893,6 +1021,27 @@ var messages = map[MsgKey]map[Language]string{
 		LangTraditionalChinese: "變更僅在新建 thread 時生效。已接入 thread 保留原執行配置、連線和歷史。",
 		LangJapanese:           "変更は新規スレッドの作成時にのみ適用されます。接続中のスレッドの設定・接続・履歴は保持されます。",
 		LangSpanish:            "Los cambios solo se aplican al crear un hilo nuevo. El hilo conectado conserva su configuración, conexión e historial.",
+	},
+	MsgSessionSettingsSaved: {
+		LangEnglish:            "Current session settings updated.",
+		LangChinese:            "已更新当前会话设置。",
+		LangTraditionalChinese: "已更新目前會話設定。",
+		LangJapanese:           "現在のセッション設定を更新しました。",
+		LangSpanish:            "Se actualizó la configuración de la sesión actual.",
+	},
+	MsgSessionSettingsRuntime: {
+		LangEnglish:            "Current session (reported by server):\nModel: %s · Reasoning: %s",
+		LangChinese:            "当前会话（服务端返回）：\n模型：%s · 推理强度：%s",
+		LangTraditionalChinese: "目前會話（伺服器回傳）：\n模型：%s · 推理強度：%s",
+		LangJapanese:           "現在のセッション（サーバーの設定）：\nモデル: %s · 推論: %s",
+		LangSpanish:            "Sesión actual (según el servidor):\nModelo: %s · Razonamiento: %s",
+	},
+	MsgSessionSettingsScope: {
+		LangEnglish:            "Changes apply to this session and are shared with other connected clients.",
+		LangChinese:            "修改作用于当前会话，并同步到其他已连接的客户端。",
+		LangTraditionalChinese: "修改套用至目前會話，並同步至其他已連線的用戶端。",
+		LangJapanese:           "変更は現在のセッションに適用され、接続中の他のクライアントにも共有されます。",
+		LangSpanish:            "Los cambios se aplican a esta sesión y se comparten con los demás clientes conectados.",
 	},
 	MsgDefaultSettingsSaved: {
 		LangEnglish:            "New-thread defaults updated; attached thread unchanged.",
@@ -5234,6 +5383,9 @@ const (
 
 const (
 	MsgDefaultSettingsScope       MsgKey = "default_settings_settingsscope"
+	MsgSessionSettingsSaved       MsgKey = "session_settings_saved"
+	MsgSessionSettingsRuntime     MsgKey = "session_settings_runtime"
+	MsgSessionSettingsScope       MsgKey = "session_settings_scope"
 	MsgDefaultSettingsSaved       MsgKey = "default_settings_settingssaved"
 	MsgDefaultSettingsRuntime     MsgKey = "default_settings_settingsruntime"
 	MsgDefaultSettingsConfigured  MsgKey = "default_settings_settingsconfigured"

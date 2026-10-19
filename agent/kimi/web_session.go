@@ -27,10 +27,11 @@ type webFrame struct {
 	Payload   json.RawMessage `json:"payload"`
 }
 type webSnapshot struct {
-	Seq      int64     `json:"as_of_seq"`
-	Epoch    string    `json:"epoch"`
-	Session  webRecord `json:"session"`
-	InFlight *struct {
+	Subagents []webTask `json:"subagents"`
+	Seq       int64     `json:"as_of_seq"`
+	Epoch     string    `json:"epoch"`
+	Session   webRecord `json:"session"`
+	InFlight  *struct {
 		TurnID   int64  `json:"turn_id"`
 		Text     string `json:"assistant_text"`
 		PromptID string `json:"current_prompt_id"`
@@ -41,6 +42,7 @@ type webSnapshot struct {
 type webSession struct {
 	agent             *webAgent
 	id                string
+	workDir           string // workspace captured at attachment; independent of later /dir changes
 	ctx               context.Context
 	cancel            context.CancelFunc
 	events            chan core.Event // run is the only sender and closer
@@ -49,6 +51,9 @@ type webSession struct {
 	conn              *websocket.Conn
 	closed, connected bool
 	turn, prompt      string
+	model, effort     string // guarded by mu, like usage
+	usage             core.ContextUsage
+	hasUsage          bool
 	own               map[string]bool
 	submitted         map[string]bool
 	// Reader-owned protocol state. No other goroutine touches these fields.
@@ -60,15 +65,17 @@ type webSession struct {
 	pending        map[string]webPending // guarded by mu; RespondPermission reads it
 	completedOrder []string
 	initial        webSnapshot
+	subagents      map[string]core.SubagentNotice // Reader-owned lifecycle state.
+	subagentOrder  []string
 }
 
 var _ core.SharedAgentSession = (*webSession)(nil)
 var _ core.AgentTurnSender = (*webSession)(nil)
 var _ core.AgentTurnCanceller = (*webSession)(nil)
 
-func newWebSession(ctx context.Context, a *webAgent, id string) (*webSession, error) {
+func newWebSession(ctx context.Context, a *webAgent, id, workDir string) (*webSession, error) {
 	lifetime, cancel := context.WithCancel(ctx)
-	s := &webSession{agent: a, id: id, ctx: lifetime, cancel: cancel, events: make(chan core.Event, 128), done: make(chan struct{}), own: map[string]bool{}, submitted: map[string]bool{}, turnKeys: map[int64]string{}, text: map[string]string{}, completed: map[string]bool{}, pending: map[string]webPending{}}
+	s := &webSession{agent: a, id: id, workDir: workDir, ctx: lifetime, cancel: cancel, events: make(chan core.Event, 128), done: make(chan struct{}), own: map[string]bool{}, submitted: map[string]bool{}, turnKeys: map[int64]string{}, text: map[string]string{}, completed: map[string]bool{}, pending: map[string]webPending{}}
 	snap, err := s.snapshot()
 	if err != nil {
 		cancel()
@@ -83,6 +90,7 @@ func newWebSession(ctx context.Context, a *webAgent, id string) (*webSession, er
 	s.connected = true
 	s.initial = snap
 	s.setSnapshotState(snap)
+	s.refreshRuntimeStatus()
 	context.AfterFunc(lifetime, func() {
 		s.mu.Lock()
 		c := s.conn
@@ -99,8 +107,11 @@ func (s *webSession) snapshot() (webSnapshot, error) {
 	if err := s.agent.api.request(s.ctx, "GET", webSessionPath(s.id)+"/snapshot", nil, &snap); err != nil {
 		return snap, err
 	}
-	if snap.Session.ID != s.id || filepath.Clean(snap.Session.Metadata.Cwd) != s.agent.workDir {
-		return snap, fmt.Errorf("kimi web: session ID or working directory does not match")
+	if snap.Session.ID != s.id {
+		return snap, fmt.Errorf("kimi web: snapshot session ID does not match %q", s.id)
+	}
+	if filepath.Clean(snap.Session.Metadata.Cwd) != s.workDir {
+		return snap, fmt.Errorf("kimi web: session working directory %q does not match selected directory %q", snap.Session.Metadata.Cwd, s.workDir)
 	}
 	if snap.Epoch == "" {
 		return snap, fmt.Errorf("kimi web: snapshot missing epoch")
@@ -171,6 +182,8 @@ func (s *webSession) setSnapshotState(snap webSnapshot) {
 	s.seq, s.epoch = snap.Seq, snap.Epoch
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.updateRecordStatusLocked(snap.Session)
+	previousTurn := s.turn
 	s.turn, s.prompt = "", ""
 	if f := snap.InFlight; f != nil {
 		key := f.PromptID
@@ -187,6 +200,10 @@ func (s *webSession) setSnapshotState(snap webSnapshot) {
 			s.prompt = snap.Session.CurrentPrompt
 		}
 		s.text[key] = f.Text
+	}
+	if s.turn != previousTurn {
+		s.usage.InputTokens, s.usage.OutputTokens = 0, 0
+		s.usage.CachedInputTokens, s.usage.CacheCreationInputTokens = 0, 0
 	}
 }
 func (s *webSession) emit(e core.Event) {
@@ -284,6 +301,7 @@ func (s *webSession) run(conn *websocket.Conn, replay []webFrame) {
 	}
 }
 func (s *webSession) emitSnapshot(snap webSnapshot) {
+	s.emitSnapshotSubagents(snap.Subagents)
 	state := s.RuntimeState()
 	if state.TurnID != "" {
 		s.emit(core.Event{Type: core.EventTurnStarted, TurnID: state.TurnID})
@@ -324,6 +342,7 @@ func (s *webSession) reconcileSnapshot(snap webSnapshot) error {
 	}
 	previousText := s.text[old]
 	s.setSnapshotState(snap)
+	s.refreshRuntimeStatus()
 	if snap.InFlight != nil && old == s.RuntimeState().TurnID && strings.HasPrefix(snap.InFlight.Text, previousText) {
 		copyFlight := *snap.InFlight
 		copyFlight.Text = strings.TrimPrefix(copyFlight.Text, previousText)

@@ -15,6 +15,7 @@ import (
 // Its zero value is usable, including for ordinary sessions that never attach
 // to a shared runtime. All fields are protected by the owner's interactiveState.mu.
 type sharedSessionState struct {
+	subagentPanels *sharedSubagentPanels
 	asyncQuestions map[string]*sharedAsyncQuestion
 	requests       map[string]Event // authoritative pending requests for all views
 	pending        []*pendingPermission
@@ -34,6 +35,7 @@ func (e *Engine) startSharedReader(state *interactiveState, as SharedAgentSessio
 		return
 	}
 	ctx, cancel := context.WithCancel(e.ctx)
+	state.shared.subagentPanels = newSharedSubagentPanels(ctx)
 	done := make(chan struct{})
 	state.unsolicitedCancel = cancel
 	state.unsolicitedDone = done
@@ -47,6 +49,7 @@ func (e *Engine) startSharedReader(state *interactiveState, as SharedAgentSessio
 		defer close(done)
 		defer cancel()
 		defer activity.end()
+		subagentCards := &sharedSubagentCards{}
 		external := map[string]*sharedForeground{}
 		tails := map[string]*sharedToolTail{}
 		var completedOrder []string
@@ -104,8 +107,33 @@ func (e *Engine) startSharedReader(state *interactiveState, as SharedAgentSessio
 				event.TurnID = as.RuntimeState().TurnID
 			}
 			if event.Type == EventNotice {
-				e.showSharedNotice(state, event.Notice)
-				continue
+				inline := false
+				if event.Notice != nil && event.Notice.Subagent != nil {
+					state.mu.Lock()
+					p, panels, foreground := state.platform, state.shared.subagentPanels, state.shared.foreground
+					state.mu.Unlock()
+					if supportsSubagentPanels(p) && e.display.CardMode == "rich" {
+						fallback := event.TurnID
+						if fallback == "" {
+							fallback = as.RuntimeState().TurnID
+						}
+						id, finalized := panels.record(*event.Notice.Subagent, fallback)
+						if id != "" && (finalized || foreground.acceptsSubagentTurn(id) || external[id] != nil || tails[id] != nil || as.RuntimeState().TurnID == id) {
+							event.TurnID, inline = id, true
+							if finalized {
+								continue
+							}
+						}
+					}
+					if !inline {
+						e.showSharedSubagentCard(ctx, state, subagentCards, event.Notice)
+					}
+				} else {
+					e.showSharedNotice(state, event.Notice)
+				}
+				if !inline {
+					continue
+				}
 			}
 			if event.Type == EventPermissionRequest || event.Type == EventPermissionResolved || event.Type == EventRuntimeStatus {
 				e.handleSharedEvent(state, as, session, sessions, event)

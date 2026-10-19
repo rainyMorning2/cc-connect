@@ -246,3 +246,70 @@ func TestApprovalFlowPickers_PreserveCustomProfileAndKeepScopesSeparate(t *testi
 		t.Fatal("complete preset retained old approval override")
 	}
 }
+
+// Native session permissions without any agent-level creation defaults.
+type nativePermissionTestAgent struct{ sharedTestAgent }
+
+func (*nativePermissionTestAgent) DefaultSettingsOnly() bool { return true }
+func (a *nativePermissionTestAgent) AttachSession(ctx context.Context, id string) (AgentSession, error) {
+	as, err := a.sharedTestAgent.AttachSession(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	s := as.(*sharedTestSession)
+	s.settings.PermissionMode = "manual"
+	return &nativePermissionTestSession{s}, nil
+}
+
+type nativePermissionTestSession struct{ *sharedTestSession }
+
+func (*nativePermissionTestSession) CurrentPermissionModes() []PermissionModeInfo {
+	return []PermissionModeInfo{{Key: "manual", NameKey: MsgPermManual}, {Key: "yolo", NameKey: MsgPermYolo}, {Key: "auto", NameKey: MsgPermAuto}}
+}
+func (s *nativePermissionTestSession) SetCurrentPermissionMode(_ context.Context, mode string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.settings.PermissionMode = mode
+	return nil
+}
+func newNativePermissionEnv(t *testing.T) *sharedTestEnv {
+	env := newSharedTestEnv(t)
+	env.e.agent = &nativePermissionTestAgent{}
+	env.send("/attach first")
+	env.await("Attached to session first")
+	env.e.sessions.GetOrCreateActive("test:user").AddHistory("user", "KEEP HISTORY")
+	return env
+}
+
+func TestNativePermissionCards_LocalizeAndSelectCurrentMode(t *testing.T) {
+	env := newNativePermissionEnv(t)
+	for _, lang := range []Language{LangEnglish, LangChinese, LangTraditionalChinese, LangJapanese, LangSpanish} {
+		env.e.i18n.SetLang(lang)
+		card := env.e.handleCardNav("act:/mode current yolo", "test:user")
+		if strings.Contains(card.RenderText(), "Sandbox") {
+			t.Fatal("native permissions rendered daemon-only fields")
+		}
+		found := false
+		for _, el := range card.Elements {
+			if sel, ok := el.(CardSelect); ok {
+				if sel.InitValue != "act:/mode current yolo" {
+					t.Fatalf("current permission not selected: %+v", sel)
+				}
+				if len(sel.Options) != 3 {
+					t.Fatalf("permission options: %+v", sel)
+				}
+				for _, option := range sel.Options {
+					if option.Value == "act:/mode current yolo" && option.Text == env.e.i18n.T(MsgPermYolo) {
+						found = true
+					}
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("localized current permission absent: %+v", card)
+		}
+		if card := env.e.handleCardNav("nav:/mode", "test:user"); !strings.Contains(card.RenderText(), "yolo") {
+			t.Fatal("/mode navigation lost native permissions")
+		}
+	}
+}

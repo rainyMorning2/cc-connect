@@ -802,13 +802,15 @@ type AgentBackgroundTerminals interface {
 	TerminateBackgroundTerminal(context.Context, string) error
 }
 
-// DefaultSettingsAgent changes creation defaults without reconfiguring an
-// attached shared runtime. Settings commands must preserve its observer/history.
+// DefaultSettingsAgent changes creation defaults. Sessions can additionally
+// opt into explicit current-setting capabilities; either workflow preserves
+// the attached observer and history.
 type DefaultSettingsAgent interface {
 	DefaultSettingsOnly() bool
 }
 
 type AgentRuntimeSettings struct {
+	PermissionMode                       string // Native session permission mode, when provided by the service.
 	Model, ReasoningEffort, Provider     string
 	ApprovalPolicy, Sandbox              string
 	PermissionProfile, ApprovalsReviewer string
@@ -839,4 +841,16 @@ type ApprovalDefaultSwitcher interface {
 // AgentRuntimeSettingsReader obtains authoritative settings without overrides.
 type AgentRuntimeSettingsReader interface {
 	ReadRuntimeSettings(context.Context) (AgentRuntimeSettings, error)
+}
+
+// Session setting capabilities change the attached runtime, without closing
+// its observer or changing the agent's defaults for future sessions.
+type SessionModelSwitcher interface {
+	CurrentModels(context.Context) ([]ModelOption, error)
+	SetCurrentModel(context.Context, string) error
+}
+
+type SessionReasoningEffortSwitcher interface {
+	CurrentReasoningEfforts(context.Context) ([]string, error)
+	SetCurrentReasoningEffort(context.Context, string) error
 }

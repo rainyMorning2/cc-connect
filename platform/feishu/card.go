@@ -342,6 +342,17 @@ func renderRichMarkdownCardMap(card *core.Card, sessionKey string) map[string]an
 	if card.CollapsedDetailsTitle != "" {
 		elements = []map[string]any{buildRichPanel(card.CollapsedDetailsTitle, false, elements)}
 	}
+	if card.PreviewText != "" {
+		preview := map[string]any{
+			"tag":  "div",
+			"text": map[string]any{"tag": "plain_text", "content": card.PreviewText, "text_size": "notation"},
+		}
+		if card.CollapsedDetailsTitle != "" {
+			elements = append(elements, preview)
+		} else {
+			elements = append([]map[string]any{preview}, elements...)
+		}
+	}
 	result["body"] = map[string]any{"elements": elements}
 	return result
 }

@@ -10,7 +10,7 @@ import (
 func findToolStep(steps []ToolStep, itemID, name string) int {
 	for i := len(steps) - 1; i >= 0; i-- {
 		step := steps[i]
-		if step.Kind == ToolStepKindThinking {
+		if step.Kind == ToolStepKindThinking || step.Kind == ToolStepKindSubagent {
 			continue
 		}
 		if itemID != "" && step.ItemID != "" {

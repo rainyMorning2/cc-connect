@@ -2823,6 +2823,50 @@ func TestCUJ_C7_SharedForegroundQueueHistoryAndDetach(t *testing.T) {
 	env.await(env.e.i18n.T(MsgSharedDetached))
 }
 
+type cujSharedDirAgent struct {
+	*sharedTestAgent
+	workDir, secondDir string // guarded by sharedTestAgent.mu
+}
+
+func (a *cujSharedDirAgent) GetWorkDir() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.workDir
+}
+
+func (a *cujSharedDirAgent) SetWorkDir(dir string) {
+	a.mu.Lock()
+	a.workDir = dir
+	a.mu.Unlock()
+}
+
+func (a *cujSharedDirAgent) ListSessions(context.Context) ([]AgentSessionInfo, error) {
+	if a.GetWorkDir() == a.secondDir {
+		return []AgentSessionInfo{{ID: "second", Summary: "Selected workspace conversation"}}, nil
+	}
+	return []AgentSessionInfo{{ID: "first", Summary: "Original workspace conversation"}}, nil
+}
+
+func TestCUJ_C7_SharedDirSwitchListsAndReattaches(t *testing.T) {
+	env := newSharedTestEnv(t)
+	targetDir := t.TempDir()
+	env.e.agent = &cujSharedDirAgent{sharedTestAgent: env.a, workDir: t.TempDir(), secondDir: targetDir}
+	env.e.SetAdminFrom("user")
+	env.send("/attach first")
+	env.await("Attached to session first")
+	env.send("/dir " + targetDir)
+	env.await(targetDir)
+	env.send("/list")
+	env.await("Selected workspace conversation")
+	if strings.Contains(env.visible(), "Original workspace conversation") {
+		t.Fatal("session list still shows the original workspace")
+	}
+	env.send("/attach second")
+	env.await("Attached to session second")
+	env.send("/detach")
+	env.await(env.e.i18n.T(MsgSharedDetached))
+}
+
 func TestCUJ_C7_SharedOrdinaryReplySteersExternalTurn(t *testing.T) {
 	env := newSharedTestEnv(t)
 	env.e.agent = &autoSteerTestAgent{env.a, true}
@@ -2965,6 +3009,7 @@ func TestCUJ_C7_SharedToolSendFollowsAttachmentAndStopsAfterDetach(t *testing.T)
 // CUJ: live selection begins observing immediately; failed attachment and
 // failed interruption preserve the current session and its event reader.
 func TestCUJ_B13_SharedSwitchAndControlFailurePreserveObserver(t *testing.T) {
+	t.Run("session list selection survives server reordering", runStableSharedSessionListJourney)
 	t.Run("text command", func(t *testing.T) {
 		env := newSharedTestEnv(t)
 		env.a.failInterrupt = true
@@ -3092,7 +3137,58 @@ func TestCUJ_C8_SharedStopAllPreservesActiveTurn(t *testing.T) {
 
 // Default-setting commands must not detach a shared runtime or discard its
 // history. Queries show server settings separately from creation defaults.
+type cujMultiwordEffortAgent struct{ *sharedSettingsTestAgent }
+
+func (*cujMultiwordEffortAgent) AvailableReasoningEfforts() []string {
+	return []string{"high", "extra high"}
+}
+
 func TestCUJ_C7_SharedSettingsPreserveLiveConversation(t *testing.T) {
+	t.Run("native permission modes match shared service", func(t *testing.T) {
+		env := newNativePermissionEnv(t)
+		env.send("/mode")
+		env.await("Always Ask")
+		env.await("Ask When Needed")
+		env.await("Never Ask")
+		env.send("/mode yolo")
+		env.await("Current session permissions (reported by server): yolo")
+		env.send("/mode current auto")
+		env.await("Current session permissions (reported by server): auto")
+		env.send("/mode manual")
+		env.await("Current session permissions (reported by server): manual")
+		env.send("/history 10")
+		env.await("KEEP HISTORY")
+		env.send("/steer still connected")
+		env.await("STEER observed: still connected")
+	})
+
+	t.Run("current session model and effort capabilities", func(t *testing.T) {
+		env, _, as := newLiveSettingsEnv(t)
+		env.send("/model switch target-model")
+		env.await("Model: target-model · Reasoning: medium")
+		env.send("/effort extra high")
+		env.await("Model: target-model · Reasoning: extra high")
+		env.send("/history 10")
+		env.await("KEEP HISTORY")
+		as.emit(Event{Type: EventText, Content: "LIVE AFTER CURRENT SETTINGS", Metadata: map[string]any{"phase": "commentary"}})
+		env.await("LIVE AFTER CURRENT SETTINGS")
+		env.send("/steer same session")
+		env.await("STEER observed: same session")
+	})
+
+	t.Run("service effort labels containing spaces", func(t *testing.T) {
+		env, a, _ := newSharedSettingsEnv(t)
+		env.e.agent = &cujMultiwordEffortAgent{a}
+		env.send("/effort")
+		env.await("extra high")
+		env.send("/effort extra high")
+		env.await("Reasoning: extra high")
+		env.send("/history 10")
+		env.await("KEEP HISTORY")
+		env.send("/steer same conversation")
+		env.await("STEER observed: same conversation")
+	})
+
 	env, _, as := newSharedSettingsEnv(t)
 	env.send("/model switch new-model")
 	env.await("New-thread defaults updated")
@@ -3247,6 +3343,30 @@ func TestCUJ_C7_SharedAsyncQuestionCardSteersWhileWorking(t *testing.T) {
 }
 
 func TestCUJ_C7_SharedRuntimeNoticeDoesNotEndTask(t *testing.T) {
+	t.Run("subagents update original parent card even after completion", runSubagentInlineJourney)
+	t.Run("subagent lifecycle preserves main conversation", func(t *testing.T) {
+		env := newSharedTestEnv(t)
+		env.send("/attach first")
+		env.await("Attached to session first")
+		as := env.a.connection("first")
+		as.emit(Event{Type: EventNotice, Notice: &AgentNotice{Kind: "subagent", Subagent: &SubagentNotice{ID: "child-1", Name: "reviewer", Status: "running", Description: "CHECK CHANGES"}}})
+		env.await("reviewer (child-1): Running")
+		env.await("CHECK CHANGES")
+		env.send("/steer main still running")
+		env.await("STEER observed: main still running")
+		as.emit(Event{Type: EventNotice, Notice: &AgentNotice{Kind: "subagent", Subagent: &SubagentNotice{ID: "child-1", Name: "reviewer", Status: "completed", Detail: "CHILD SUMMARY"}}})
+		env.await("reviewer (child-1): Completed")
+		env.await("CHILD SUMMARY")
+		env.send("/steer continue after child")
+		env.await("STEER observed: continue after child")
+		as.emit(Event{Type: EventResult, TurnID: "active-first", Content: "MAIN FINAL", Done: true})
+		env.await("MAIN FINAL")
+		as.emit(Event{Type: EventNotice, Notice: &AgentNotice{Kind: "subagent", Subagent: &SubagentNotice{ID: "late-child", Status: "failed", Detail: "LATE CHILD FAILURE"}}})
+		env.await("LATE CHILD FAILURE")
+		env.send("/detach")
+		env.await(env.e.i18n.T(MsgSharedDetached))
+	})
+
 	p := &observedAsyncCardPlatform{stubCardPlatform: stubCardPlatform{stubPlatformEngine: stubPlatformEngine{n: "test"}}}
 	a := &sharedTestAgent{}
 	e := NewEngine("shared", a, []Platform{p}, t.TempDir()+"/sessions.json", LangEnglish)
