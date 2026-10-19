@@ -2918,6 +2918,50 @@ func TestCUJ_C7_SharedForegroundQueueHistoryAndDetach(t *testing.T) {
 	env.await(env.e.i18n.T(MsgSharedDetached))
 }
 
+type cujSharedDirAgent struct {
+	*sharedTestAgent
+	workDir, secondDir string // guarded by sharedTestAgent.mu
+}
+
+func (a *cujSharedDirAgent) GetWorkDir() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.workDir
+}
+
+func (a *cujSharedDirAgent) SetWorkDir(dir string) {
+	a.mu.Lock()
+	a.workDir = dir
+	a.mu.Unlock()
+}
+
+func (a *cujSharedDirAgent) ListSessions(context.Context) ([]AgentSessionInfo, error) {
+	if a.GetWorkDir() == a.secondDir {
+		return []AgentSessionInfo{{ID: "second", Summary: "Selected workspace conversation"}}, nil
+	}
+	return []AgentSessionInfo{{ID: "first", Summary: "Original workspace conversation"}}, nil
+}
+
+func TestCUJ_C7_SharedDirSwitchListsAndReattaches(t *testing.T) {
+	env := newSharedTestEnv(t)
+	targetDir := t.TempDir()
+	env.e.agent = &cujSharedDirAgent{sharedTestAgent: env.a, workDir: t.TempDir(), secondDir: targetDir}
+	env.e.SetAdminFrom("user")
+	env.send("/attach first")
+	env.await("Attached to session first")
+	env.send("/dir " + targetDir)
+	env.await(targetDir)
+	env.send("/list")
+	env.await("Selected workspace conversation")
+	if strings.Contains(env.visible(), "Original workspace conversation") {
+		t.Fatal("session list still shows the original workspace")
+	}
+	env.send("/attach second")
+	env.await("Attached to session second")
+	env.send("/detach")
+	env.await(env.e.i18n.T(MsgSharedDetached))
+}
+
 func TestCUJ_C7_SharedOrdinaryReplySteersExternalTurn(t *testing.T) {
 	env := newSharedTestEnv(t)
 	env.e.agent = &autoSteerTestAgent{env.a, true}

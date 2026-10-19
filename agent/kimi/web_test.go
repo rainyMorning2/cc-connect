@@ -30,6 +30,8 @@ type webFixture struct {
 	snapshot        webSnapshot
 	rejectSubscribe bool
 	queueOnly       bool
+	status          map[string]any
+	runtimeStatus   map[string]any
 }
 
 func newWebFixture(t *testing.T) *webFixture {
@@ -117,6 +119,12 @@ func (f *webFixture) serve(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == "GET" && r.URL.Path == "/api/v1/sessions/session_test":
 		f.reply(w, f.snapshot.Session)
+	case r.Method == "GET" && strings.HasSuffix(r.URL.Path, "/status"):
+		if f.runtimeStatus != nil {
+			f.reply(w, f.runtimeStatus)
+		} else {
+			f.reply(w, map[string]any{"model": f.snapshot.Session.AgentConfig.Model})
+		}
 	case r.Method == "GET" && r.URL.Path == "/api/v1/config":
 		f.reply(w, map[string]string{"default_model": "fixture-model"})
 	case r.Method == "GET" && strings.HasSuffix(r.URL.Path, "/snapshot"):
@@ -148,6 +156,9 @@ func (f *webFixture) serve(w http.ResponseWriter, r *http.Request) {
 		// Deliberately finish over WS BEFORE the REST response reaches the caller.
 		f.broadcastLocked("turn.started", map[string]any{"agentId": "main", "turnId": 2, "promptId": body.ID, "prompt": body.Content[0].Text}, false)
 		f.broadcastLocked("assistant.delta", map[string]any{"agentId": "main", "turnId": 2, "delta": "IM answer"}, true)
+		if f.status != nil {
+			f.broadcastLocked("agent.status.updated", f.status, false)
+		}
 		f.appendMessage(body.ID, "assistant", "IM answer")
 		f.broadcastLocked("turn.ended", map[string]any{"agentId": "main", "turnId": 2, "reason": "completed"}, false)
 		f.reply(w, map[string]any{"prompt_id": body.ID, "status": "running"})
