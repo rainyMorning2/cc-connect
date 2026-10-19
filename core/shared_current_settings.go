@@ -38,6 +38,16 @@ func (e *Engine) currentSettingsSession(sessionKey, command string) AgentSession
 // Shared by text commands, menu navigation and in-place selector callbacks.
 // A runtime lacking these capabilities keeps the creation-defaults workflow.
 func (e *Engine) currentSessionSettingsCard(sessionKey, command string, args []string) *Card {
+	if command == "mode" {
+		agent, _ := e.sessionContextForKey(sessionKey)
+		// Agents without creation-time permission controls expose current settings.
+		if _, defaults := agent.(ModeSwitcher); !defaults {
+			if len(args) > 0 && strings.EqualFold(args[0], "current") {
+				args = args[1:]
+			}
+			return e.currentPermissionModeCard(e.interactiveKeyForSessionKey(sessionKey), args)
+		}
+	}
 	as := e.currentSettingsSession(sessionKey, command)
 	if as == nil {
 		return nil
@@ -82,9 +92,9 @@ func (e *Engine) currentSessionSettingsCard(sessionKey, command string, args []s
 	var options []CardSelectOption
 	selected := ""
 	for i, name := range names {
-		action := fmt.Sprintf("act:/%s %d", command, i+1)
+		action := fmt.Sprintf("act:/%s %s", command, name)
 		if command == "model" {
-			action = fmt.Sprintf("act:/model switch %d", i+1)
+			action = "act:/model switch " + name
 		}
 		options = append(options, CardSelectOption{Text: fmt.Sprintf("%d. %s", i+1, name), Value: action})
 		if name == current {

@@ -40,7 +40,7 @@ busy_message_mode = "queue" # 改为 "steer" 开启忙碌时普通文字自动�
 
 省略 `backend` 或使用 `backend = "exec"` 时继续使用原来的 CLI 接入。
 `web` 后端无需通过 PATH 找到 `kimi`，也不会调用 CLI。
-Provider、权限在 Kimi 服务或浏览器中配置；此后端不接受
+Provider 和新会话权限默认值在 Kimi 服务或浏览器中配置；当前会话权限可用 `/mode` 切换。此后端不接受
 `mode`、`provider`、`env`、`timeout_mins` 覆盖。
 可用 `model`、`reasoning_effort` 设置 CC-Connect 新会话的默认值；省略时跟随服务默认值。
 
@@ -65,6 +65,10 @@ Provider、权限在 Kimi 服务或浏览器中配置；此后端不接受
 | `/history` | 读取服务端历史，包含其他客户端发起的对话 |
 | `/model` | 已接入时查看或修改当前会话模型；未接入时选择新会话默认模型 |
 | `/effort`、`/reasoning` | 已接入时查看或修改当前会话思考强度；未接入时选择新会话默认强度 |
+| `/mode`、`/mode <manual\|yolo\|auto>` | 查看或切换当前会话权限，与 Web 的三项一致；也支持 `/mode current [模式]` |
+| `/terminals [list]` | 列出当前会话运行中的后台 Shell；不包含子 agent、前台命令和 Web 手动终端 |
+| `/terminals stop <id>`、`/terminals stop all` | 停止指定后台 Shell 或本次列出的全部后台 Shell；不停止主轮次 |
+| 子 agent 动态 | 同步等待、运行、暂停、完成、失败和取消状态，以及服务端提供的任务描述和结果摘要 |
 | `/stop` | 按当前 prompt ID 停止执行；旧轮次的停止请求不会取消新轮次 |
 | 审批和问答 | 支持批准、会话级批准、拒绝、取消，以及结构化问题回答 |
 | `/steer <文本>` | 尽力将指令插入服务处理请求时正在执行的轮次，不锁定原轮次 |
@@ -119,7 +123,41 @@ Provider、权限在 Kimi 服务或浏览器中配置；此后端不接受
 一旦尝试提交 prompt，网络错误也可能代表服务已接收，因此不会擅自删除可能被会话引用的附件。
 成功提交的文件由 Kimi 服务管理，不在本端完成轮次时删除。具体格式的解析能力由 Kimi 的模型和工具决定。
 
-本版不提供后台终端控制、服务端删除会话和聊天端权限切换；这些操作可在 Kimi Web 中执行。
+### 当前会话权限
+
+接入会话后，`/mode` 展示与 Kimi Web 相同的三个选项，顺序和含义为：
+
+| 值 | Web 名称 | 行为 |
+|---|---|---|
+| `manual` | 始终询问 | 仅自动读取，其余操作逐一确认 |
+| `yolo` | 必要时询问 | 自动完成常规修改和命令；高危操作、提问和计划仍会询问 |
+| `auto` | 完全自动 | 所有操作和判断自动完成，不主动打断询问 |
+
+例如 `/mode yolo` 或 `/mode current yolo`。菜单和命令均只通过当前会话的
+`POST /api/v1/sessions/{id}/profile` 更新 `agent_config.permission_mode`，
+再从 `/status` 回读确认；浏览器和其他客户端观察同一设置。不修改全局或新会话默认值，
+不重建会话、不清空历史，运行中切换也按 Web 的服务端行为立即应用。
+未接入时会提示先 `/attach`，不自动创建会话。服务端拒绝或回读不一致时显示失败。
+
+### 后台 Shell 与子 agent
+
+聊天端 `/terminals` 与 Codex 的后台 Shell 语义对齐，读取 Kimi `/tasks` 中
+`kind = bash`、`run_in_background = true` 且仍在运行的任务。停止命令调用对应任务的
+`:cancel`，先校验任务所属会话及类型；`stop all` 只处理执行时列出的任务，
+不停止主轮次、前台命令、子 agent 或其他工具任务。任务恰好已结束时按已停止处理，
+其他服务端错误会显示出来。Web 手动打开的 PTY 终端属于另一类 `/terminals` API，继续在 Web 管理。
+
+子 agent 通过 `subagent.*` 生命周期事件显示独立动态。支持可更新卡片的平台（如飞书）
+为每个子 agent 保留一张原位更新的折叠卡，标题显示名称和状态，详情包含服务端提供的任务 ID、
+模型、描述、完成摘要或失败原因；失败和暂停时展开详情，其余状态默认折叠。
+不支持卡片更新的平台降级为状态消息。卡片更新异步串行处理，慢速更新不阻塞主回答；
+同一子 agent 的密集状态变化合并为最新状态。摘要最多显示 4000 个字符。子 agent 的逐 token 输出和工具流
+不会混入主回答，其结束事件也不会结束主轮次或覆盖主模型、上下文和用量。
+接入时从 snapshot 展示已有的活跃子 agent，重连后同步 snapshot 中已知任务的状态，
+相同事件重放不重复提示。长时间离线期间已从服务端 snapshot 移除的子任务无法靠此快照补回。
+
+会话管理公开的是归档/恢复：归档从默认列表隐藏会话，但保留历史，不等同于 Codex 的删除线程。
+本版也未将 Kimi 的归档/恢复接入聊天命令。
 
 官方协议仍是实验性接口；升级 Kimi 后以该服务的 `/openapi.json`、`/asyncapi.json` 为准。
 参考：[Kimi Server API](https://www.kimi.com/code/docs/en/kimi-code-cli/reference/server-api.html)。
@@ -141,3 +179,6 @@ go test ./agent/kimi -run TestWebLiveTwoObservers -v
 
 开发时还使用独立的本地 Anthropic 模拟服务完成两客户端交替发消息、中文文件名上传、
 运行中 steer 测试，验证真实 Kimi 2.2.0 的接口与事件格式；没有使用账号额度。
+
+子 agent 卡片提供一行常驻短预览：运行时显示任务首行，结束后优先显示结果或原因首行；
+最多 48 个字符，超长省略，完整内容保留在详情中。

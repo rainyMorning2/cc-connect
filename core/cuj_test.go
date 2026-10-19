@@ -3238,6 +3238,24 @@ func (*cujMultiwordEffortAgent) AvailableReasoningEfforts() []string {
 }
 
 func TestCUJ_C7_SharedSettingsPreserveLiveConversation(t *testing.T) {
+	t.Run("native permission modes match shared service", func(t *testing.T) {
+		env := newNativePermissionEnv(t)
+		env.send("/mode")
+		env.await("Always Ask")
+		env.await("Ask When Needed")
+		env.await("Never Ask")
+		env.send("/mode yolo")
+		env.await("Current session permissions (reported by server): yolo")
+		env.send("/mode current auto")
+		env.await("Current session permissions (reported by server): auto")
+		env.send("/mode manual")
+		env.await("Current session permissions (reported by server): manual")
+		env.send("/history 10")
+		env.await("KEEP HISTORY")
+		env.send("/steer still connected")
+		env.await("STEER observed: still connected")
+	})
+
 	t.Run("current session model and effort capabilities", func(t *testing.T) {
 		env, _, as := newLiveSettingsEnv(t)
 		env.send("/model switch target-model")
@@ -3419,6 +3437,29 @@ func TestCUJ_C7_SharedAsyncQuestionCardSteersWhileWorking(t *testing.T) {
 }
 
 func TestCUJ_C7_SharedRuntimeNoticeDoesNotEndTask(t *testing.T) {
+	t.Run("subagent lifecycle preserves main conversation", func(t *testing.T) {
+		env := newSharedTestEnv(t)
+		env.send("/attach first")
+		env.await("Attached to session first")
+		as := env.a.connection("first")
+		as.emit(Event{Type: EventNotice, Notice: &AgentNotice{Kind: "subagent", Subagent: &SubagentNotice{ID: "child-1", Name: "reviewer", Status: "running", Description: "CHECK CHANGES"}}})
+		env.await("reviewer (child-1): Running")
+		env.await("CHECK CHANGES")
+		env.send("/steer main still running")
+		env.await("STEER observed: main still running")
+		as.emit(Event{Type: EventNotice, Notice: &AgentNotice{Kind: "subagent", Subagent: &SubagentNotice{ID: "child-1", Name: "reviewer", Status: "completed", Detail: "CHILD SUMMARY"}}})
+		env.await("reviewer (child-1): Completed")
+		env.await("CHILD SUMMARY")
+		env.send("/steer continue after child")
+		env.await("STEER observed: continue after child")
+		as.emit(Event{Type: EventResult, TurnID: "active-first", Content: "MAIN FINAL", Done: true})
+		env.await("MAIN FINAL")
+		as.emit(Event{Type: EventNotice, Notice: &AgentNotice{Kind: "subagent", Subagent: &SubagentNotice{ID: "late-child", Status: "failed", Detail: "LATE CHILD FAILURE"}}})
+		env.await("LATE CHILD FAILURE")
+		env.send("/detach")
+		env.await(env.e.i18n.T(MsgSharedDetached))
+	})
+
 	p := &observedAsyncCardPlatform{stubCardPlatform: stubCardPlatform{stubPlatformEngine: stubPlatformEngine{n: "test"}}}
 	a := &sharedTestAgent{}
 	e := NewEngine("shared", a, []Platform{p}, t.TempDir()+"/sessions.json", LangEnglish)

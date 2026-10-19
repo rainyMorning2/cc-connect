@@ -109,7 +109,7 @@ func (s *webSession) ReadRuntimeSettings(ctx context.Context) (core.AgentRuntime
 		return core.AgentRuntimeSettings{}, err
 	}
 	s.applyStatus(webStatus{Model: status.Model, ThinkingEffort: status.ThinkingLevel, ContextTokens: status.ContextTokens, MaxContextTokens: status.MaxContextTokens})
-	settings := core.AgentRuntimeSettings{ApprovalPolicy: status.Permission}
+	settings := core.AgentRuntimeSettings{ApprovalPolicy: status.Permission, PermissionMode: status.Permission}
 	if status.Model != nil {
 		settings.Model = *status.Model
 	}

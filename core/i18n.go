@@ -251,6 +251,19 @@ const (
 	MsgCurrentModeReadFailed     MsgKey = "current_mode_read_failed"
 	MsgCurrentModeState          MsgKey = "current_mode_state"
 	MsgPermDefault               MsgKey = "permission_preset_default"
+	MsgSubagentTitle             MsgKey = "subagenttitle"
+	MsgSubagentQueued            MsgKey = "subagentqueued"
+	MsgSubagentRunning           MsgKey = "subagentrunning"
+	MsgSubagentSuspended         MsgKey = "subagentsuspended"
+	MsgSubagentCompleted         MsgKey = "subagentcompleted"
+	MsgSubagentFailed            MsgKey = "subagentfailed"
+	MsgSubagentCancelled         MsgKey = "subagentcancelled"
+	MsgSubagentState             MsgKey = "subagentstate"
+	MsgSubagentTask              MsgKey = "subagenttask"
+	MsgPermManual                MsgKey = "permission_manual"
+	MsgPermAuto                  MsgKey = "permission_auto"
+	MsgPermYolo                  MsgKey = "permission_yolo"
+	MsgCurrentNativeModeState    MsgKey = "current_native_permission_mode"
 	MsgPermAsk                   MsgKey = "permission_preset_ask"
 	MsgPermAutoReview            MsgKey = "permission_preset_auto_review"
 	MsgPermFullAccess            MsgKey = "permission_preset_full_access"
@@ -919,6 +932,97 @@ var messages = map[MsgKey]map[Language]string{
 		LangTraditionalChinese: "目前 thread 權限（伺服器回傳）：\nProfile：%s · 審批：%s · 審批者：%s · 沙箱：%s",
 		LangJapanese:           "現在のスレッドの権限（サーバーの設定）:\nプロファイル: %s · 承認: %s · 審査者: %s · サンドボックス: %s",
 		LangSpanish:            "Permisos del hilo actual (según el servidor):\nPerfil: %s · Aprobación: %s · Revisor: %s · Sandbox: %s",
+	},
+	MsgSubagentTitle: {
+		LangEnglish:            "Sub-agent activity",
+		LangChinese:            "子 agent 动态",
+		LangTraditionalChinese: "子 agent 動態",
+		LangJapanese:           "サブエージェントの動作",
+		LangSpanish:            "Actividad del subagente",
+	},
+	MsgSubagentQueued: {
+		LangEnglish:            "Queued",
+		LangChinese:            "等待启动",
+		LangTraditionalChinese: "等待啟動",
+		LangJapanese:           "待機中",
+		LangSpanish:            "En espera",
+	},
+	MsgSubagentRunning: {
+		LangEnglish:            "Running",
+		LangChinese:            "运行中",
+		LangTraditionalChinese: "執行中",
+		LangJapanese:           "実行中",
+		LangSpanish:            "En ejecución",
+	},
+	MsgSubagentSuspended: {
+		LangEnglish:            "Suspended",
+		LangChinese:            "已暂停",
+		LangTraditionalChinese: "已暫停",
+		LangJapanese:           "一時停止",
+		LangSpanish:            "Suspendido",
+	},
+	MsgSubagentCompleted: {
+		LangEnglish:            "Completed",
+		LangChinese:            "已完成",
+		LangTraditionalChinese: "已完成",
+		LangJapanese:           "完了",
+		LangSpanish:            "Completado",
+	},
+	MsgSubagentFailed: {
+		LangEnglish:            "Failed",
+		LangChinese:            "失败",
+		LangTraditionalChinese: "失敗",
+		LangJapanese:           "失敗",
+		LangSpanish:            "Fallido",
+	},
+	MsgSubagentCancelled: {
+		LangEnglish:            "Cancelled",
+		LangChinese:            "已取消",
+		LangTraditionalChinese: "已取消",
+		LangJapanese:           "キャンセル済み",
+		LangSpanish:            "Cancelado",
+	},
+	MsgSubagentState: {
+		LangEnglish:            "%s (%s): %s",
+		LangChinese:            "%s（%s）：%s",
+		LangTraditionalChinese: "%s（%s）：%s",
+		LangJapanese:           "%s（%s）: %s",
+		LangSpanish:            "%s (%s): %s",
+	},
+	MsgSubagentTask: {
+		LangEnglish:            "Task: %s",
+		LangChinese:            "任务：%s",
+		LangTraditionalChinese: "任務：%s",
+		LangJapanese:           "タスク: %s",
+		LangSpanish:            "Tarea: %s",
+	},
+	MsgPermManual: {
+		LangEnglish:            "Always Ask",
+		LangChinese:            "始终询问",
+		LangTraditionalChinese: "始終詢問",
+		LangJapanese:           "常に確認",
+		LangSpanish:            "Preguntar siempre",
+	},
+	MsgPermAuto: {
+		LangEnglish:            "Never Ask",
+		LangChinese:            "完全自动",
+		LangTraditionalChinese: "完全自動",
+		LangJapanese:           "確認せず自動実行",
+		LangSpanish:            "No preguntar nunca",
+	},
+	MsgPermYolo: {
+		LangEnglish:            "Ask When Needed",
+		LangChinese:            "必要时询问",
+		LangTraditionalChinese: "必要時詢問",
+		LangJapanese:           "必要なときに確認",
+		LangSpanish:            "Preguntar cuando sea necesario",
+	},
+	MsgCurrentNativeModeState: {
+		LangEnglish:            "Current session permissions (reported by server): %s",
+		LangChinese:            "当前会话权限（服务端返回）：%s",
+		LangTraditionalChinese: "目前會話權限（伺服器回傳）：%s",
+		LangJapanese:           "現在のセッションの権限（サーバーの設定）: %s",
+		LangSpanish:            "Permisos de la sesión actual (según el servidor): %s",
 	},
 	MsgPermDefault: {
 		LangEnglish:            "Follow daemon defaults",

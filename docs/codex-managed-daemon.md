@@ -187,3 +187,33 @@ Use `codex app-server daemon stop` when intentionally stopping the daemon. `rest
 3. Busy mode applies to turns started by any connected client. Pending approval/question answers are handled first, and attachments cannot be injected through steer. `steer` requires `daemon_enable_steer = true`.
 4. Keep the socket, credentials, provider and daemon environment consistent.
 5. CC-Connect refuses to attach to the thread identified by its inherited `CODEX_THREAD_ID`. That is the Codex thread that launched the process, so refusing it prevents a self-control loop; it does not forbid attaching to other active threads.
+
+### Model and effort menus
+
+Both creation defaults and attached-session menus read the daemon's paginated
+`model/list` catalog. With no model override, creation effort options use the
+working directory's effective model from `config/read`, or the catalog default
+when no model is configured. They do not fall back to local model caches or a
+fixed effort list. Changing the creation model clears the previous effort override.
+Selector actions carry model/effort names, so changes to catalog ordering do not
+silently change the meaning of an existing button.
+
+### Subagent status cards
+
+The managed daemon backend maps parent-thread `collabAgentToolCall` items to the
+same per-child cards used by Kimi. Cards show the child ID, status, and available
+task, model, and result details. A child thread ID is used when no name is supplied.
+Platforms with editable cards update each original card; normal states are
+collapsed, while failures and interruptions are expanded. Other platforms receive
+ordinary notices. Child state never completes the parent reply.
+
+Status comes from `agentsStates`: completing a `wait` call does not imply that its
+children completed. Attachment and reconnection fold historical items into their
+latest state, without replaying intermediate states or announcing tasks already
+finished before initial attachment. These are the last known states reported by
+the parent thread. Child token/tool streams are not separately subscribed to, and
+this feature does not automatically spawn agents or cover legacy stdio/exec backends.
+
+Subagent cards keep a short preview visible outside the details panel: the task
+while running, then the result or reason when available. Only the first nonempty
+line is shown, limited to 48 characters; full text remains in the details.

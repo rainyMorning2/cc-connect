@@ -27,10 +27,11 @@ type webFrame struct {
 	Payload   json.RawMessage `json:"payload"`
 }
 type webSnapshot struct {
-	Seq      int64     `json:"as_of_seq"`
-	Epoch    string    `json:"epoch"`
-	Session  webRecord `json:"session"`
-	InFlight *struct {
+	Subagents []webTask `json:"subagents"`
+	Seq       int64     `json:"as_of_seq"`
+	Epoch     string    `json:"epoch"`
+	Session   webRecord `json:"session"`
+	InFlight  *struct {
 		TurnID   int64  `json:"turn_id"`
 		Text     string `json:"assistant_text"`
 		PromptID string `json:"current_prompt_id"`
@@ -64,6 +65,8 @@ type webSession struct {
 	pending        map[string]webPending // guarded by mu; RespondPermission reads it
 	completedOrder []string
 	initial        webSnapshot
+	subagents      map[string]core.SubagentNotice // Reader-owned lifecycle state.
+	subagentOrder  []string
 }
 
 var _ core.SharedAgentSession = (*webSession)(nil)
@@ -298,6 +301,7 @@ func (s *webSession) run(conn *websocket.Conn, replay []webFrame) {
 	}
 }
 func (s *webSession) emitSnapshot(snap webSnapshot) {
+	s.emitSnapshotSubagents(snap.Subagents)
 	state := s.RuntimeState()
 	if state.TurnID != "" {
 		s.emit(core.Event{Type: core.EventTurnStarted, TurnID: state.TurnID})

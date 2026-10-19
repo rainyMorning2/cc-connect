@@ -40,6 +40,15 @@ func (s *webSession) handleFrame(f webFrame) error {
 	if !f.Volatile && f.Seq > 0 && f.Seq <= s.seq {
 		return nil
 	}
+	if strings.HasPrefix(f.Type, "subagent.") {
+		if err := s.handleSubagentFrame(f); err != nil {
+			return err
+		}
+		if !f.Volatile && f.Seq > s.seq {
+			s.seq = f.Seq
+		}
+		return nil
+	}
 	var p webEventPayload
 	if err := json.Unmarshal(f.Payload, &p); err != nil {
 		return fmt.Errorf("kimi web: event payload: %w", err)

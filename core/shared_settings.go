@@ -152,7 +152,8 @@ func (e *Engine) applyDefaultReasoning(agent Agent, args []string) (bool, error)
 	}
 	valid := false
 	for _, effort := range efforts {
-		if target == effort {
+		if strings.EqualFold(target, effort) {
+			target = effort
 			valid = true
 		}
 	}
@@ -302,7 +303,7 @@ func (e *Engine) renderDefaultSettingsCard(agent Agent, sessionKey, command stri
 				}
 			}
 			for i, m := range models {
-				action := fmt.Sprintf("act:/model switch %d", i+1)
+				action := "act:/model switch " + m.Name
 				opts = append(opts, CardSelectOption{Text: fmt.Sprintf("%d. %s", i+1, m.Name), Value: action})
 				if m.Name == current {
 					selected = action
@@ -313,7 +314,7 @@ func (e *Engine) renderDefaultSettingsCard(agent Agent, sessionKey, command stri
 	case "reasoning":
 		if sw, ok := agent.(ReasoningEffortSwitcher); ok {
 			for i, effort := range sw.AvailableReasoningEfforts() {
-				action := fmt.Sprintf("act:/reasoning %d", i+1)
+				action := "act:/reasoning " + effort
 				opts = append(opts, CardSelectOption{Text: fmt.Sprintf("%d. %s", i+1, effort), Value: action})
 				if effort == sw.GetReasoningEffort() {
 					selected = action

@@ -29,6 +29,7 @@ func (s *managedSession) reconcileReconnect(snapshot managedSnapshot, expected s
 		if response.Thread.ID != snapshot.Thread.ID || !sameManagedCwd(s.agent.GetWorkDir(), response.Thread.Cwd) {
 			return fmt.Errorf("reconnect reconciliation returned a different thread/workspace")
 		}
+		s.reconcileSubagents(response.Thread.Turns)
 		turn = findManagedTurn(response.Thread.Turns, expected)
 	}
 	if turn == nil {

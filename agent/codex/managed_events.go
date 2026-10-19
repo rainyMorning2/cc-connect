@@ -158,6 +158,12 @@ func (s *managedSession) handleItem(m daemonMessage) error {
 	}
 	id, _ := p.Item["id"].(string)
 	kind, _ := p.Item["type"].(string)
+	if kind == "collabAgentToolCall" {
+		for _, n := range s.collabUpdates(p.Item, s.subagents) {
+			s.emitSubagent(n)
+		}
+		return nil
+	}
 	if m.Method == "item/started" {
 		if kind == "fileChange" && id != "" {
 			if preview := appServerFileChangePreview(p.Item["changes"]); preview != "" {

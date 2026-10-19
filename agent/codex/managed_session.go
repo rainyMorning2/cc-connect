@@ -59,32 +59,35 @@ type managedRequest struct {
 }
 
 type managedSession struct {
-	agent              *managedAgent
-	ctx                context.Context
-	cancel             context.CancelFunc
-	events             chan core.Event // runLoop exclusively emits and closes this channel
-	done               chan struct{}
-	closeOnce          sync.Once
-	opMu               sync.Mutex
-	mu                 sync.Mutex
-	rpc                *daemonRPC
-	thread             string
-	turn               string
-	connected          bool
-	closed             bool
-	canInput           bool
-	pending            map[string]*managedRequest
-	completed          map[string]bool
-	usageWarningLevels map[string]int
-	usageNoticeResets  map[string]int64
-	usageSnapshots     map[string]managedUsageSnapshot
-	noticeKeys         map[string]string
-	textStreams        map[string]*managedTextStream
-	seenItems          map[string]bool
-	fileChanges        map[string]string // proposed file changes, keyed by turn/item
-	finalText          []string
-	preamble           string
-	decoder            *appServerSession // reuse transport-independent item/usage conversion only
+	agent                *managedAgent
+	ctx                  context.Context
+	cancel               context.CancelFunc
+	events               chan core.Event // runLoop exclusively emits and closes this channel
+	done                 chan struct{}
+	closeOnce            sync.Once
+	opMu                 sync.Mutex
+	mu                   sync.Mutex
+	rpc                  *daemonRPC
+	thread               string
+	turn                 string
+	connected            bool
+	closed               bool
+	canInput             bool
+	pending              map[string]*managedRequest
+	completed            map[string]bool
+	usageWarningLevels   map[string]int
+	usageNoticeResets    map[string]int64
+	usageSnapshots       map[string]managedUsageSnapshot
+	noticeKeys           map[string]string
+	textStreams          map[string]*managedTextStream
+	seenItems            map[string]bool
+	fileChanges          map[string]string              // proposed file changes, keyed by turn/item
+	subagents            map[string]core.SubagentNotice // event-reader owned
+	subagentOrder        []string
+	initialSubagentTurns []managedTurn
+	finalText            []string
+	preamble             string
+	decoder              *appServerSession // reuse transport-independent item/usage conversion only
 }
 
 func newManagedSession(ctx context.Context, a *managedAgent, id string) (*managedSession, error) {
@@ -116,6 +119,7 @@ func newManagedSession(ctx context.Context, a *managedAgent, id string) (*manage
 		s.preamble = buildCodexPromptPreamble(a.systemPrompt, a.appendPrompt)
 		a.mu.RUnlock()
 	}
+	s.initialSubagentTurns = snapshot.Thread.Turns
 	go s.runLoop(rpc)
 	return s, nil
 }
@@ -211,6 +215,8 @@ func (s *managedSession) applySnapshot(snapshot managedSnapshot, expected string
 func (s *managedSession) runLoop(rpc *daemonRPC) {
 	defer close(s.done)
 	defer close(s.events)
+	s.reconcileSubagents(s.initialSubagentTurns)
+	s.initialSubagentTurns = nil
 	for {
 		for {
 			select {
@@ -280,6 +286,7 @@ func (s *managedSession) reconnect() (*daemonRPC, error) {
 			err = s.applySnapshot(snapshot, id, rpc)
 		}
 		if err == nil {
+			s.reconcileSubagents(snapshot.Thread.Turns)
 			err = s.reconcileReconnect(snapshot, expectedTurn, rpc)
 		}
 		if err != nil {

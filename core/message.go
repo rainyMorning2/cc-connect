@@ -530,8 +530,15 @@ type AgentSessionInfo struct {
 	GitBranch    string
 }
 
+// SubagentNotice describes a child agent independently of the main reply.
+type SubagentNotice struct {
+	ID, Name, TaskID, Description, Model string
+	Status, Detail                       string
+}
+
 // AgentNotice carries service-provided information separately from model replies.
 type AgentNotice struct {
+	Subagent       *SubagentNotice
 	UsageThreshold int
 	Kind           string
 	Message        string

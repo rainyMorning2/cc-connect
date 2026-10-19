@@ -102,7 +102,10 @@ func (a *webAgent) AvailableReasoningEfforts() []string {
 	}
 	// Refresh from the service, so browser changes to model capabilities are
 	// reflected in the next settings command rather than a hardcoded list.
-	a.AvailableModels(ctx)
+	if _, err := a.loadModels(ctx); err != nil {
+		slog.Warn("kimi web: read model catalog for effort options", "error", err)
+		return nil
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	for _, option := range a.models {
@@ -178,6 +181,25 @@ func (s *webSession) updateProfile(ctx context.Context, config map[string]string
 	if record.ID != s.id || filepath.Clean(record.Metadata.Cwd) != s.workDir {
 		return fmt.Errorf("kimi web: updated profile returned an out-of-scope session")
 	}
-	_, err := s.ReadRuntimeSettings(ctx)
-	return err
+	settings, err := s.ReadRuntimeSettings(ctx)
+	if err != nil {
+		return fmt.Errorf("kimi web: profile update accepted but verification failed: %w", err)
+	}
+	for key, requested := range config {
+		var actual string
+		switch key {
+		case "model":
+			actual = settings.Model
+		case "thinking":
+			actual = settings.ReasoningEffort
+		case "permission_mode":
+			actual = settings.PermissionMode
+		default:
+			continue
+		}
+		if actual != requested {
+			return fmt.Errorf("kimi web: %s update not confirmed: server reports %q instead of %q", key, actual, requested)
+		}
+	}
+	return nil
 }

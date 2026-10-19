@@ -526,3 +526,24 @@ func TestTrackedPermissionCard_RejectsInvalidHandle(t *testing.T) {
 		t.Fatal("accepted a handle that was not returned by tracked send")
 	}
 }
+
+func TestRenderCard_PreviewRemainsVisibleOutsideCollapsedDetails(t *testing.T) {
+	card := core.NewCard().RichMarkdown().CollapsedDetails("Child · running").Markdown("FULL TASK AND RESULT").Build()
+	card.PreviewText = "检查 <module> **原文**"
+	got := decodeRenderedCard(t, card)
+	els := got["body"].(map[string]any)["elements"].([]any)
+	if len(els) != 2 {
+		t.Fatalf("body=%#v", els)
+	}
+	panel := els[0].(map[string]any)
+	if panel["tag"] != "collapsible_panel" || panel["expanded"] != false {
+		t.Fatalf("panel=%#v", panel)
+	}
+	preview := els[1].(map[string]any)["text"].(map[string]any)
+	if preview["tag"] != "plain_text" || preview["content"] != card.PreviewText || preview["text_size"] != "notation" {
+		t.Fatalf("preview=%#v", preview)
+	}
+	if !strings.Contains(card.RenderText(), "FULL TASK AND RESULT") {
+		t.Fatal("fallback lost details")
+	}
+}

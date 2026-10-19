@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -228,4 +229,79 @@ func TestManagedLiveCurrentModelAndEffort(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatalf("observer did not receive settings updates: model=%s, effort=%s", s.GetModel(), s.GetReasoningEffort())
+}
+
+func TestManagedDefaults_ModelAndEffortOptionsComeFromDaemon(t *testing.T) {
+	cwd := t.TempDir()
+	socket := managedFixture(t, func(ws *websocket.Conn) {
+		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+			switch m.Method {
+			case "config/read":
+				var params map[string]any
+				if err := json.Unmarshal(m.Params, &params); err != nil {
+					t.Error(err)
+				}
+				if params["cwd"] != cwd || params["includeLayers"] != false {
+					t.Errorf("config scope: %v", params)
+				}
+				return map[string]any{"config": map[string]any{"model": "server-default"}}, true
+			case "model/list":
+				var params map[string]any
+				if err := json.Unmarshal(m.Params, &params); err != nil {
+					t.Error(err)
+				}
+				if params["cursor"] == "next" {
+					return map[string]any{"data": []map[string]any{
+						{"id": "alternate", "model": "alternate", "supportedReasoningEfforts": []map[string]string{{"reasoningEffort": "extra high"}, {"reasoningEffort": "light"}}},
+					}}, true
+				}
+				return map[string]any{"nextCursor": "next", "data": []map[string]any{
+					{"id": "server-default", "model": "server-default", "supportedReasoningEfforts": []map[string]string{{"reasoningEffort": "server-only"}}},
+					{"id": "hidden", "model": "hidden", "hidden": true},
+				}}, true
+			}
+			t.Errorf("unexpected default-settings RPC: %s", m.Method)
+			return nil, false
+		})
+	})
+	a := fixtureManagedAgent(t, socket, cwd, nil)
+	models := a.AvailableModels(context.Background())
+	if len(models) != 2 || models[0].Name != "server-default" || models[1].Name != "alternate" {
+		t.Fatalf("models not from daemon: %+v", models)
+	}
+	if got := a.AvailableReasoningEfforts(); !reflect.DeepEqual(got, []string{"server-only"}) {
+		t.Fatalf("default efforts: %v", got)
+	}
+	a.SetReasoningEffort("server-only")
+	a.SetModel("alternate")
+	if a.GetReasoningEffort() != "" {
+		t.Fatal("old model's effort retained")
+	}
+	if got := a.AvailableReasoningEfforts(); !reflect.DeepEqual(got, []string{"extra high", "light"}) {
+		t.Fatalf("selected model efforts: %v", got)
+	}
+	a.SetReasoningEffort("extra high")
+	params := a.newThreadParams()
+	if params["model"] != "alternate" || params["config"].(map[string]any)["model_reasoning_effort"] != "extra high" {
+		t.Fatalf("creation lost server effort: %v", params)
+	}
+	opts := a.WorkspaceAgentOptions()
+	opts["work_dir"] = cwd
+	cloned, err := New(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cloned.(core.ReasoningEffortSwitcher).GetReasoningEffort() != "extra high" {
+		t.Fatal("workspace clone normalized away server effort")
+	}
+}
+
+func TestManagedDefaults_DaemonUnavailableDoesNotOfferLocalOptions(t *testing.T) {
+	a := fixtureManagedAgent(t, filepath.Join(t.TempDir(), "missing.sock"), t.TempDir(), nil)
+	if got := a.AvailableModels(context.Background()); len(got) != 0 {
+		t.Fatalf("local models leaked: %v", got)
+	}
+	if got := a.AvailableReasoningEfforts(); len(got) != 0 {
+		t.Fatalf("hardcoded efforts leaked: %v", got)
+	}
 }

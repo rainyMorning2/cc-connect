@@ -47,6 +47,7 @@ func (e *Engine) startSharedReader(state *interactiveState, as SharedAgentSessio
 		defer close(done)
 		defer cancel()
 		defer activity.end()
+		subagentCards := &sharedSubagentCards{}
 		external := map[string]*sharedForeground{}
 		tails := map[string]*sharedToolTail{}
 		var completedOrder []string
@@ -104,7 +105,11 @@ func (e *Engine) startSharedReader(state *interactiveState, as SharedAgentSessio
 				event.TurnID = as.RuntimeState().TurnID
 			}
 			if event.Type == EventNotice {
-				e.showSharedNotice(state, event.Notice)
+				if event.Notice != nil && event.Notice.Kind == "subagent" {
+					e.showSharedSubagentCard(ctx, state, subagentCards, event.Notice)
+				} else {
+					e.showSharedNotice(state, event.Notice)
+				}
 				continue
 			}
 			if event.Type == EventPermissionRequest || event.Type == EventPermissionResolved || event.Type == EventRuntimeStatus {

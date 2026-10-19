@@ -261,3 +261,23 @@ func TestSharedSettingsCardValidationErrorDoesNotChangeDefaults(t *testing.T) {
 	}
 	assertSharedSettingsPreserved(t, env, as)
 }
+
+func TestDefaultSettingsSelectors_BindValuesNotIndices(t *testing.T) {
+	env, a, _ := newSharedSettingsEnv(t)
+	for command, want := range map[string]string{"model": "act:/model switch new-model", "reasoning": "act:/reasoning high"} {
+		card := env.e.renderDefaultSettingsCard(a, "test:user", command)
+		found := false
+		for _, el := range card.Elements {
+			if sel, ok := el.(CardSelect); ok {
+				for _, option := range sel.Options {
+					if option.Value == want {
+						found = true
+					}
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("%s selector does not bind stable value %q: %+v", command, want, card)
+		}
+	}
+}

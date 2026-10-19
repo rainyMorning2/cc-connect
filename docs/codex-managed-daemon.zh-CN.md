@@ -48,7 +48,10 @@ daemon_enable_delete = true
 托管模式不接受 `env` 和 `app_server_url`；凭据、Provider 和进程环境需要在 daemon 中配置。接入已有 thread 时，该 thread 自身的 model、Provider、审批策略和 sandbox 设置会保留；`model`、`mode`、`reasoning_effort`、`provider` 只用于新建 thread。
 
 已接入后，`/model` 和 `/effort`（或 `/reasoning`）命令直接查看、修改当前 thread 的模型和推理强度；
-未接入时设置新建 thread 的默认值。当前模型和对应的 effort 选项从 daemon 的 `model/list` 获取。
+未接入时设置新建 thread 的默认值。模型目录和对应的 effort 选项在接入前后都从 daemon 的 `model/list` 获取，支持分页和服务端定义的强度名称。
+未指定新建默认模型时，通过带工作目录的 `config/read` 解析有效默认模型；未配置模型时跟随目录中的默认模型。
+不会回退到本地缓存或固定强度列表。更换新建默认模型会清除原模型的强度覆盖。
+菜单按钮绑定具体值，其他客户端修改模型或目录顺序后，旧按钮不会按新序号选择另一个值。
 切换使用 `thread/settings/update`，只发送所选字段，并读取服务端设置确认；不重建 thread、断开连接或清空历史，
 也不改变新建默认值。与该 thread 连接的 CLI、IDE 等其他客户端会看到相同设置。
 当前轮次或待处理审批尚未结束时拒绝修改，请在空闲后重试。
@@ -199,3 +202,18 @@ daemon 退出后，CC-Connect 最多重试 `daemon_reconnect_attempts` 次连接
 4. `daemon_socket`、Provider 和凭据应与实际运行 daemon 的环境保持一致。
 
 5. CC-Connect 拒绝连接继承的 `CODEX_THREAD_ID` 所标识的 thread。这是启动当前进程的 Codex thread，拒绝它是为避免自我控制循环；其他正在运行的 thread 仍可接入。
+
+### 子 agent 展示
+
+managed daemon 后端将父 thread 的 `collabAgentToolCall` 同步为子 agent 独立卡片，
+与 Kimi 使用同一种展示：标题显示标识和状态，详情包含服务端提供的任务、模型和结果。
+协议没有提供名称时使用子 thread ID。支持更新卡片的平台原位更新，正常状态折叠，
+失败或暂停展开；其他平台使用普通通知。子 agent 状态不会结束主回答。
+
+状态取自 `agentsStates`，不会将 `wait` 工具调用完成误判为子 agent 完成。
+接入与重连时合并父 thread 历史中的最新状态，不重复播放中间状态或首次接入前已结束的任务。
+展示以父 thread 提供的最后已知状态为准；不额外订阅子 thread 的逐 token 输出、工具流，
+也不自动触发多 agent。此功能不包含旧的 stdio/exec 后端。
+
+子 agent 卡片提供一行常驻短预览：运行时显示任务首行，结束后优先显示结果或原因首行；
+最多 48 个字符，超长省略，完整内容保留在详情中。

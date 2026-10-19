@@ -823,6 +823,7 @@ type DefaultSettingsAgent interface {
 }
 
 type AgentRuntimeSettings struct {
+	PermissionMode                       string // Native session permission mode, when provided by the service.
 	Model, ReasoningEffort, Provider     string
 	ApprovalPolicy, Sandbox              string
 	PermissionProfile, ApprovalsReviewer string

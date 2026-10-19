@@ -12,6 +12,7 @@ type Card struct {
 	Header                *CardHeader
 	Elements              []CardElement
 	RichMarkdown          bool   // request the platform's richer markdown renderer when available
+	PreviewText           string // optional plain-text summary outside details; Elements retain full text for fallbacks
 	CollapsedDetailsTitle string // optionally wrap the body in a closed details panel; text fallback retains the body
 }
 

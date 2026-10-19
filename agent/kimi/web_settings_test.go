@@ -213,3 +213,53 @@ func TestWebLiveSessionModelAndEffortChanges(t *testing.T) {
 	}
 	t.Logf("session=%s, peer sees model=%s, effort=%s", first.CurrentSessionID(), settings.Model, settings.ReasoningEffort)
 }
+
+func TestWebSettings_CatalogFailureDoesNotReuseStaleEfforts(t *testing.T) {
+	f := newWebFixture(t)
+	if got := f.agent.AvailableReasoningEfforts(); len(got) == 0 {
+		t.Fatal("fixture did not populate model cache")
+	}
+	original := f.server.Config.Handler
+	f.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/models" {
+			http.Error(w, "catalog unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		original.ServeHTTP(w, r)
+	})
+	if got := f.agent.AvailableReasoningEfforts(); len(got) != 0 {
+		t.Fatalf("offered stale efforts after catalog failure: %v", got)
+	}
+}
+
+func TestWebSettings_ModelAndEffortRejectUnconfirmedUpdates(t *testing.T) {
+	for _, setting := range []string{"model", "thinking"} {
+		t.Run(setting, func(t *testing.T) {
+			f := newWebFixture(t)
+			f.runtimeStatus = map[string]any{"model": "fixture-model", "thinking_level": "low"}
+			original := f.server.Config.Handler
+			f.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/profile") {
+					f.mu.Lock()
+					defer f.mu.Unlock()
+					f.reply(w, f.snapshot.Session) // Accepted without applying the requested setting.
+					return
+				}
+				original.ServeHTTP(w, r)
+			})
+			as, err := f.agent.AttachSession(context.Background(), "session_test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer as.Close()
+			if setting == "model" {
+				err = as.(core.SessionModelSwitcher).SetCurrentModel(context.Background(), "alternate-model")
+			} else {
+				err = as.(core.SessionReasoningEffortSwitcher).SetCurrentReasoningEffort(context.Background(), "high")
+			}
+			if err == nil || !strings.Contains(err.Error(), "not confirmed") {
+				t.Fatalf("unapplied %s reported success: %v", setting, err)
+			}
+		})
+	}
+}

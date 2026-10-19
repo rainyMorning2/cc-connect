@@ -148,6 +148,7 @@ func New(opts map[string]any) (core.Agent, error) {
 		activeIdx:          -1,
 	}
 	if transport == "managed_daemon" {
+		agent.reasoningEffort = strings.TrimSpace(reasoningEffort)
 		approvalMode := ""
 		if raw, exists := opts["approval_mode"]; exists {
 			value, ok := raw.(string)

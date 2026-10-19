@@ -157,6 +157,9 @@ func (f *webFixture) serve(w http.ResponseWriter, r *http.Request) {
 		if effort, ok := config["thinking"].(string); ok {
 			f.runtimeStatus["thinking_level"] = effort
 		}
+		if mode, ok := config["permission_mode"].(string); ok {
+			f.runtimeStatus["permission"] = mode
+		}
 		f.reply(w, f.snapshot.Session)
 	case r.Method == "GET" && strings.HasSuffix(r.URL.Path, "/snapshot"):
 		f.snapshot.Seq = f.seq

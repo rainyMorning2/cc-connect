@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -81,4 +82,72 @@ func TestCurrentSettingsInvalidChoicesPreserveCurrentSession(t *testing.T) {
 		t.Fatalf("invalid choice changed session: %+v", settings)
 	}
 	assertSharedSettingsPreserved(t, env, as)
+}
+
+type changingSettingsSession struct {
+	*liveSettingsTestSession
+	models  []ModelOption
+	efforts []string
+}
+
+func (s *changingSettingsSession) CurrentModels(context.Context) ([]ModelOption, error) {
+	return s.models, nil
+}
+func (s *changingSettingsSession) CurrentReasoningEfforts(context.Context) ([]string, error) {
+	return s.efforts, nil
+}
+
+func TestCurrentSettings_StaleSelectorsPreserveSelectedValue(t *testing.T) {
+	for _, command := range []string{"model", "reasoning"} {
+		for _, removed := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/removed=%v", command, removed), func(t *testing.T) {
+				env, _, as := newLiveSettingsEnv(t)
+				s := &changingSettingsSession{liveSettingsTestSession: &liveSettingsTestSession{as}, models: []ModelOption{{Name: "server-model"}, {Name: "target-model"}}, efforts: []string{"medium", "extra high"}}
+				env.e.interactiveMu.Lock()
+				state := env.e.interactiveStates[env.e.interactiveKeyForSessionKey("test:user")]
+				env.e.interactiveMu.Unlock()
+				state.mu.Lock()
+				state.agentSession = s
+				state.mu.Unlock()
+				card := env.e.handleCardNav("nav:/"+command, "test:user")
+				target := "extra high"
+				if command == "model" {
+					target = "target-model"
+				}
+				action := ""
+				for _, el := range card.Elements {
+					if sel, ok := el.(CardSelect); ok {
+						for _, option := range sel.Options {
+							if strings.Contains(option.Text, target) {
+								action = option.Value
+							}
+						}
+					}
+				}
+				if action == "" {
+					t.Fatal("no selector action")
+				}
+				// Another client changes the model/catalog between display and click.
+				s.models = []ModelOption{{Name: "target-model"}, {Name: "server-model"}}
+				s.efforts = []string{"extra high", "medium"}
+				if removed {
+					s.models = s.models[1:]
+					s.efforts = s.efforts[1:]
+				}
+				result := env.e.handleCardNav(action, "test:user").RenderText()
+				settings, _ := as.ReadRuntimeSettings(context.Background())
+				actual := settings.ReasoningEffort
+				if command == "model" {
+					actual = settings.Model
+				}
+				if removed {
+					if !strings.Contains(result, "Error") || actual == target {
+						t.Fatalf("obsolete choice not rejected: %s, %+v", result, settings)
+					}
+				} else if actual != target {
+					t.Fatalf("clicked %s (%s), applied %s", target, action, actual)
+				}
+			})
+		}
+	}
 }
