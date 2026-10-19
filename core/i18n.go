@@ -259,6 +259,9 @@ const (
 	MsgSubagentFailed            MsgKey = "subagentfailed"
 	MsgSubagentCancelled         MsgKey = "subagentcancelled"
 	MsgSubagentState             MsgKey = "subagentstate"
+	MsgSubagentPanelIdentity     MsgKey = "subagentpanelidentity"
+	MsgSubagentPanelState        MsgKey = "subagentpanelstate"
+	MsgSubagentPanelTask         MsgKey = "subagentpaneltask"
 	MsgSubagentTask              MsgKey = "subagenttask"
 	MsgPermManual                MsgKey = "permission_manual"
 	MsgPermAuto                  MsgKey = "permission_auto"
@@ -981,6 +984,27 @@ var messages = map[MsgKey]map[Language]string{
 		LangTraditionalChinese: "已取消",
 		LangJapanese:           "キャンセル済み",
 		LangSpanish:            "Cancelado",
+	},
+	MsgSubagentPanelIdentity: {
+		LangEnglish:            "%s (%s)",
+		LangChinese:            "%s（%s）",
+		LangTraditionalChinese: "%s（%s）",
+		LangJapanese:           "%s（%s）",
+		LangSpanish:            "%s (%s)",
+	},
+	MsgSubagentPanelState: {
+		LangEnglish:            "%s %s",
+		LangChinese:            "%s %s",
+		LangTraditionalChinese: "%s %s",
+		LangJapanese:           "%s %s",
+		LangSpanish:            "%s %s",
+	},
+	MsgSubagentPanelTask: {
+		LangEnglish:            "%s %s · %s",
+		LangChinese:            "%s %s · %s",
+		LangTraditionalChinese: "%s %s · %s",
+		LangJapanese:           "%s %s · %s",
+		LangSpanish:            "%s %s · %s",
 	},
 	MsgSubagentState: {
 		LangEnglish:            "%s (%s): %s",

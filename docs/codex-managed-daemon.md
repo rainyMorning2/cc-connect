@@ -223,3 +223,9 @@ line is shown, limited to 48 characters; full text remains in the details.
 Session-list buttons bind the complete thread ID, so server-side reordering does
 not change their target. Missing targets never fall back to prefix/name matches.
 Run `/list` again after upgrading; old cards still carry index-based actions.
+
+Subagent panel titles use `status emoji name (ID) · short task`. Names and IDs
+are capped at 12 characters each, and the first nonempty task line at 16, including
+an ellipsis when truncated. Missing names fall back to the ID without duplication.
+Statuses use ⏳ queued, 🔄 running, ⏸️ suspended, ✅ completed, ❌ failed, 🚫 cancelled,
+and ❔ for unknown states. Full IDs, task descriptions, and status text remain in details.

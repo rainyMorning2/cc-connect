@@ -82,3 +82,55 @@ func TestSubagentPreview_CompactAndTracksLifecycle(t *testing.T) {
 		})
 	}
 }
+
+func TestSubagentPanelTitle_ShortTaskAndFullDetails(t *testing.T) {
+	for _, lang := range []Language{LangEnglish, LangChinese, LangTraditionalChinese, LangJapanese, LangSpanish} {
+		e := &Engine{i18n: NewI18n(lang)}
+		n := SubagentNotice{ID: "agent-1", Name: "explore", Status: "completed", Description: "\n检查会话列表选择逻辑\n完整任务要求", Detail: "完成结果"}
+		want := "✅ " + e.i18n.Tf(MsgSubagentPanelIdentity, "explore", "agent-1") + " · 检查会话列表选择逻辑"
+		card := e.buildSubagentCard(n)
+		steps := e.mergeSubagentPanels(nil, map[string]SubagentNotice{n.ID: n}, []string{n.ID})
+		if card.CollapsedDetailsTitle != want || len(steps) != 1 || steps[0].Name != want {
+			t.Fatalf("%s: inconsistent titles: card=%q steps=%+v", lang, card.CollapsedDetailsTitle, steps)
+		}
+		for _, full := range []string{n.ID, n.Description, n.Detail} {
+			if !strings.Contains(card.RenderText(), full) || !strings.Contains(steps[0].Summary, full) {
+				t.Fatalf("full detail lost: %q", full)
+			}
+		}
+	}
+	e := &Engine{i18n: NewI18n(LangEnglish)}
+	n := SubagentNotice{Name: strings.Repeat("名", 30), Description: strings.Repeat("任", 30), Status: "running"}
+	want := "🔄 " + strings.Repeat("名", 11) + "… · " + strings.Repeat("任", 15) + "…"
+	if got := e.subagentPanelTitle(n); got != want {
+		t.Fatalf("long title=%q, want=%q", got, want)
+	}
+	n = SubagentNotice{ID: "12345678901234567890", Status: "running"}
+	if got := e.subagentPanelTitle(n); got != "🔄 12345678901…" {
+		t.Fatalf("ID fallback=%q", got)
+	}
+}
+
+func TestSubagentPanelTitle_StatusEmojiFirstAndIDRetained(t *testing.T) {
+	e := &Engine{i18n: NewI18n(LangEnglish)}
+	for status, emoji := range map[string]string{"queued": "⏳", "running": "🔄", "suspended": "⏸️", "completed": "✅", "failed": "❌", "cancelled": "🚫", "future-status": "❔"} {
+		n := SubagentNotice{ID: "agent-1", Name: "explore", Description: "Check sessions", Status: status}
+		if got := e.subagentPanelTitle(n); got != emoji+" explore (agent-1) · Check sessions" {
+			t.Fatalf("%s: %q", status, got)
+		}
+		if !strings.Contains(e.subagentNoticeText(n), e.subagentStatus(status)) {
+			t.Fatalf("status text missing from details: %s", status)
+		}
+	}
+	n := SubagentNotice{ID: "12345678901234567890", Name: "explore", Status: "running"}
+	if got := e.subagentPanelTitle(n); got != "🔄 explore (12345678901…)" {
+		t.Fatalf("long ID: %q", got)
+	}
+	if !strings.Contains(e.subagentNoticeText(n), n.ID) {
+		t.Fatal("full ID missing from details")
+	}
+	n = SubagentNotice{ID: "agent-1", Name: "agent-1", Status: "completed"}
+	if got := e.subagentPanelTitle(n); got != "✅ agent-1" {
+		t.Fatalf("duplicate ID: %q", got)
+	}
+}

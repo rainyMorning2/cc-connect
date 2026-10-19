@@ -101,11 +101,7 @@ func (e *Engine) runSharedSubagentCard(ctx context.Context, p Platform, reply an
 }
 
 func (e *Engine) buildSubagentCard(n SubagentNotice) *Card {
-	name := n.Name
-	if name == "" {
-		name = n.ID
-	}
-	label := e.i18n.Tf(MsgSubagentState, name, n.ID, e.subagentStatus(n.Status))
+	label := e.subagentPanelTitle(n)
 	color := "indigo"
 	switch n.Status {
 	case "completed":
@@ -135,16 +131,58 @@ func subagentPreview(n SubagentNotice) string {
 	if strings.TrimSpace(text) == "" {
 		text = n.Detail
 	}
+	return subagentFirstLine(text, 48)
+}
+
+func subagentFirstLine(text string, limit int) string {
 	for _, line := range strings.Split(strings.ReplaceAll(text, "\r", "\n"), "\n") {
 		line = strings.Join(strings.Fields(line), " ")
 		if line == "" {
 			continue
 		}
 		chars := []rune(line)
-		if len(chars) > 48 {
-			return string(chars[:47]) + "…"
+		if len(chars) > limit {
+			return string(chars[:limit-1]) + "…"
 		}
 		return line
 	}
 	return ""
+}
+
+func (e *Engine) subagentPanelTitle(n SubagentNotice) string {
+	name := subagentFirstLine(n.Name, 12)
+	id := subagentFirstLine(n.ID, 12)
+	if name == "" {
+		name = id
+	} else if id != "" && strings.TrimSpace(n.Name) != strings.TrimSpace(n.ID) {
+		name = e.i18n.Tf(MsgSubagentPanelIdentity, name, id)
+	}
+	if name == "" {
+		name = e.i18n.T(MsgSubagentTitle)
+	}
+	status := subagentStatusEmoji(n.Status)
+	task := subagentFirstLine(n.Description, 16)
+	if task == "" {
+		return e.i18n.Tf(MsgSubagentPanelState, status, name)
+	}
+	return e.i18n.Tf(MsgSubagentPanelTask, status, name, task)
+}
+
+func subagentStatusEmoji(status string) string {
+	switch status {
+	case "queued":
+		return "⏳"
+	case "running":
+		return "🔄"
+	case "suspended":
+		return "⏸️"
+	case "completed":
+		return "✅"
+	case "failed":
+		return "❌"
+	case "cancelled":
+		return "🚫"
+	default:
+		return "❔"
+	}
 }

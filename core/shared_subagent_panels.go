@@ -118,12 +118,8 @@ func (e *Engine) mergeSubagentPanels(steps []ToolStep, notices map[string]Subage
 	}
 	for _, id := range order {
 		n := notices[id]
-		name := n.Name
-		if name == "" {
-			name = n.ID
-		}
 		result = append(result, ToolStep{ItemID: n.ID, Kind: ToolStepKindSubagent,
-			Name:    e.i18n.Tf(MsgSubagentState, name, n.ID, e.subagentStatus(n.Status)),
+			Name:    e.subagentPanelTitle(n),
 			Summary: e.subagentNoticeText(n), ResultTail: subagentPreview(n), Status: n.Status,
 			Done: n.Status == "completed" || n.Status == "failed" || n.Status == "cancelled"})
 	}
