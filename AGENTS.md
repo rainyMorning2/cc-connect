@@ -168,7 +168,10 @@ All user-facing strings must go through `core/i18n.go`:
   `~/.bashrc` 和 Go 持久配置中。
 - `GOCACHE=/home/daizhen/.cache/go-build`：当前默认编译缓存；
   `GOMODCACHE` 不控制编译缓存的位置。
-- `GOTMPDIR` 当前未设置；构建临时文件需另行考虑，不能只检查缓存目录。
+- `GOTMPDIR=/home/daizhen/workspace/.cache/go-tmp`：Go 构建临时目录，
+  已配置在 `~/.bashrc` 和 Go 持久配置中；目录位于 ext4 磁盘上，避免
+  Go 默认把构建临时文件放进 `/tmp`。它不控制测试代码或其他工具自行
+  创建的临时文件，不能据此认为 `/tmp` 完全不会再被使用。
 
 **本机 `/tmp` 是 tmpfs，文件会占用内存或 swap。不要把 Go 编译缓存、
 依赖缓存或大型构建临时目录放在 `/tmp`，也不要为每次任务创建独立的
@@ -177,8 +180,8 @@ All user-facing strings must go through `core/i18n.go`:
 3 GiB swap 耗尽；这是资源叠加的线索，不能据此认定单一任务是根因。
 
 若沙箱无法写入现有缓存，使用工作区内普通磁盘上的可写目录，例如
-`/home/daizhen/workspace/.cache/go-build`；大型构建临时文件可使用
-`/home/daizhen/workspace/.cache/go-tmp` 并通过 `GOTMPDIR` 指定。
+`/home/daizhen/workspace/.cache/go-build`；构建临时文件复用上述
+`GOTMPDIR` 目录，不另建 `/tmp/go-build*` 目录或覆盖回 `/tmp`。
 使用前创建目录并用 `findmnt -T <目录>` 确认其不在 tmpfs 上。
 需要覆盖变量时仅对本次命令设置，不擅自修改用户的全局环境或 `go env -w`
 配置，也不要为常规验证清空共享缓存。
