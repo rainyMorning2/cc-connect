@@ -16,6 +16,54 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+func TestManagedDefaultSettings_ReadsScopedServerDefaultsWithoutThread(t *testing.T) {
+	for _, tc := range []struct {
+		name                  string
+		config                map[string]any
+		wantModel, wantEffort string
+	}{
+		{"configured", map[string]any{"model": "configured-model", "model_reasoning_effort": "high"}, "configured-model", "high"},
+		{"model catalog", map[string]any{}, "server-model", "medium"},
+		{"configured model effort", map[string]any{"model": "configured-model"}, "configured-model", "low"},
+		{"unknown model effort", map[string]any{"model": "unknown-model"}, "unknown-model", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cwd := t.TempDir()
+			socket := managedFixture(t, func(ws *websocket.Conn) {
+				fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+					switch m.Method {
+					case "config/read":
+						var params map[string]any
+						if err := json.Unmarshal(m.Params, &params); err != nil {
+							t.Error(err)
+						}
+						if params["cwd"] != cwd || params["includeLayers"] != false {
+							t.Errorf("defaults use wrong directory scope: %v", params)
+						}
+						return map[string]any{"config": tc.config}, true
+					case "model/list":
+						return map[string]any{"data": []map[string]any{
+							{"id": "server-model", "model": "server-model", "isDefault": true, "defaultReasoningEffort": "medium"},
+							{"id": "configured-model", "model": "configured-model", "defaultReasoningEffort": "low"},
+						}}, true
+					default:
+						t.Errorf("default read created or modified a thread: %s", m.Method)
+						return nil, false
+					}
+				})
+			})
+			a := fixtureManagedAgent(t, socket, cwd, map[string]any{"model": "local-override", "reasoning_effort": "max"})
+			settings, err := a.ReadDefaultSettings(context.Background())
+			if err != nil || settings.Model != tc.wantModel || settings.ReasoningEffort != tc.wantEffort {
+				t.Fatalf("wrong server defaults: %+v, %v", settings, err)
+			}
+			if a.GetModel() != "local-override" || a.GetReasoningEffort() != "max" {
+				t.Fatal("reading defaults changed local overrides")
+			}
+		})
+	}
+}
+
 func TestManagedCurrentModelAndEffort_UpdateAttachedThreadWithoutChangingDefaults(t *testing.T) {
 	cwd := t.TempDir()
 	var mu sync.Mutex

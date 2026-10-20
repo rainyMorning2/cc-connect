@@ -13,16 +13,67 @@ import (
 
 var _ core.SessionModelSwitcher = (*managedSession)(nil)
 var _ core.SessionReasoningEffortSwitcher = (*managedSession)(nil)
+var _ core.AgentDefaultSettingsReader = (*managedAgent)(nil)
 
 type managedModel struct {
-	ID          string `json:"id"`
-	Model       string `json:"model"`
-	Description string `json:"description"`
-	Hidden      bool   `json:"hidden"`
-	IsDefault   bool   `json:"isDefault"`
-	Efforts     []struct {
+	ID            string `json:"id"`
+	Model         string `json:"model"`
+	Description   string `json:"description"`
+	Hidden        bool   `json:"hidden"`
+	IsDefault     bool   `json:"isDefault"`
+	DefaultEffort string `json:"defaultReasoningEffort"`
+	Efforts       []struct {
 		Effort string `json:"reasoningEffort"`
 	} `json:"supportedReasoningEfforts"`
+}
+
+func (a *managedAgent) ReadDefaultSettings(ctx context.Context) (core.AgentRuntimeSettings, error) {
+	rpc, err := a.openRPC(ctx)
+	if err != nil {
+		return core.AgentRuntimeSettings{}, err
+	}
+	defer rpc.close()
+	cwd, err := filepath.Abs(a.GetWorkDir())
+	if err != nil {
+		return core.AgentRuntimeSettings{}, fmt.Errorf("codex managed: resolve defaults directory: %w", err)
+	}
+	var response struct {
+		Config struct {
+			Model  string `json:"model"`
+			Effort string `json:"model_reasoning_effort"`
+		} `json:"config"`
+	}
+	if err := rpc.request(ctx, "config/read", map[string]any{"includeLayers": false, "cwd": cwd}, &response); err != nil {
+		return core.AgentRuntimeSettings{}, fmt.Errorf("codex managed: read server defaults: %w", err)
+	}
+	settings := core.AgentRuntimeSettings{Model: response.Config.Model, ReasoningEffort: response.Config.Effort}
+	if settings.Model != "" && settings.ReasoningEffort != "" {
+		return settings, nil
+	}
+	models, err := readManagedModelCatalog(ctx, rpc)
+	if err != nil {
+		return settings, fmt.Errorf("codex managed: resolve model defaults: %w", err)
+	}
+	if settings.Model == "" {
+		for _, model := range models {
+			if model.IsDefault {
+				settings.Model = model.Model
+				if settings.Model == "" {
+					settings.Model = model.ID
+				}
+				break
+			}
+		}
+	}
+	if settings.ReasoningEffort == "" {
+		for _, model := range models {
+			if model.Model == settings.Model || model.ID == settings.Model {
+				settings.ReasoningEffort = model.DefaultEffort
+				break
+			}
+		}
+	}
+	return settings, nil
 }
 
 func (s *managedSession) currentModelCatalog(ctx context.Context) ([]managedModel, error) {

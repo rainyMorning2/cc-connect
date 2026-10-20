@@ -309,6 +309,40 @@ func TestManagedDefaultsConfigureNewThreadWithoutWritingDaemonCredentials(t *tes
 	}
 }
 
+func TestManagedDefaults_ResetOmitsModelAndEffortFromNewThread(t *testing.T) {
+	created := make(chan map[string]any, 1)
+	cwd := t.TempDir()
+	socket := managedFixture(t, func(ws *websocket.Conn) {
+		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+			if m.Method != "thread/start" {
+				t.Errorf("unexpected method %s", m.Method)
+				return nil, false
+			}
+			var params map[string]any
+			if err := json.Unmarshal(m.Params, &params); err != nil {
+				t.Error(err)
+			}
+			created <- params
+			return fixtureSnapshot(cwd, "server-default-thread", ""), true
+		})
+	})
+	a := fixtureManagedAgent(t, socket, cwd, map[string]any{"model": "selected-model", "reasoning_effort": "high"})
+	a.SetModel("")
+	a.SetReasoningEffort("")
+	as, err := a.StartSession(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer as.Close()
+	params := <-created
+	if _, ok := params["model"]; ok {
+		t.Fatalf("reset still overrides server model: %v", params)
+	}
+	if _, ok := params["config"]; ok {
+		t.Fatalf("reset still overrides server effort: %v", params)
+	}
+}
+
 func managedFixture(t *testing.T, handler func(*websocket.Conn)) string {
 	t.Helper()
 	if runtime.GOOS == "windows" {
