@@ -21,10 +21,18 @@ func isSettingsCommand(command string) bool {
 	return false
 }
 
+func resetsCreationDefault(command string, args []string) bool {
+	return (command == "model" || command == "reasoning") && len(args) == 1 && strings.EqualFold(args[0], "reset-default")
+}
+
 func (e *Engine) handleDefaultSettingsCommand(p Platform, msg *Message, command string, args []string) bool {
 	agent, _, key, err := e.commandContext(p, msg)
 	if err != nil || !defaultSettingsOnly(agent) {
 		return false
+	}
+	if resetsCreationDefault(command, args) {
+		e.replySettingsCard(p, msg, e.defaultSettingsCardAction(command, args[0], msg.SessionKey))
+		return true
 	}
 	if card := e.currentSessionSettingsCard(msg.SessionKey, command, args); card != nil {
 		e.replySettingsCard(p, msg, card)
@@ -84,6 +92,9 @@ func (e *Engine) applyDefaultSetting(agent Agent, sessionKey, key, command strin
 	if len(args) == 0 {
 		return false, nil
 	}
+	if resetsCreationDefault(command, args) {
+		return true, e.resetCreationDefault(agent, sessionKey, key, command)
+	}
 	switch command {
 	case "model":
 		return e.applyDefaultModel(agent, sessionKey, key, args)
@@ -98,6 +109,67 @@ func (e *Engine) applyDefaultSetting(agent Agent, sessionKey, key, command strin
 		return e.applyDefaultProvider(agent, args)
 	}
 	return false, nil
+}
+
+// Reset only creation defaults, even when this menu belongs to a live session.
+// Model setters may clear effort, so restore it to keep the two resets separate.
+func (e *Engine) resetCreationDefault(agent Agent, sessionKey, key, command string) error {
+	if command == "reasoning" {
+		return e.setDefaultReasoning(agent, "")
+	}
+	sw, ok := agent.(ModelSwitcher)
+	if !ok {
+		return fmt.Errorf("%s", e.i18n.T(MsgModelNotSupported))
+	}
+	ps, hasProviders := agent.(ProviderSwitcher)
+	var active *ProviderConfig
+	if hasProviders {
+		active = ps.GetActiveProvider()
+	}
+	if agent == e.agent {
+		if active != nil && active.Model != "" && e.providerModelSaveFunc != nil {
+			if err := e.providerModelSaveFunc(active.Name, ""); err != nil {
+				return fmt.Errorf("clear provider model default: %w", err)
+			}
+		}
+		if e.modelSaveFunc != nil {
+			if err := e.modelSaveFunc(""); err != nil {
+				return fmt.Errorf("clear model default: %w", err)
+			}
+		}
+	}
+	if active != nil {
+		providers, _ := SetProviderModel(ps.ListProviders(), active.Name, "")
+		ps.SetProviders(providers)
+	}
+	effort, hasEffort := agent.(ReasoningEffortSwitcher)
+	var previousEffort string
+	if hasEffort {
+		previousEffort = effort.GetReasoningEffort()
+	}
+	sw.SetModel("")
+	if hasEffort {
+		effort.SetReasoningEffort(previousEffort)
+	}
+	if e.projectState != nil && e.multiWorkspace && agent != e.agent {
+		e.projectState.ClearWorkspaceModelOverride(workspaceModelOverrideKey(key, sessionKey, agent))
+		e.projectState.Save()
+	}
+	return nil
+}
+
+func (e *Engine) setDefaultReasoning(agent Agent, target string) error {
+	sw, ok := agent.(ReasoningEffortSwitcher)
+	if !ok {
+		return fmt.Errorf("%s", e.i18n.T(MsgReasoningNotSupported))
+	}
+	if agent == e.agent && e.reasoningSaveFunc != nil {
+		if err := e.reasoningSaveFunc(target); err != nil {
+			return fmt.Errorf("save reasoning default: %w", err)
+		}
+	}
+	sw.SetReasoningEffort(target)
+	return nil
 }
 
 func (e *Engine) applyDefaultApproval(agent Agent, args []string) (bool, error) {
@@ -160,8 +232,7 @@ func (e *Engine) applyDefaultReasoning(agent Agent, args []string) (bool, error)
 	if !valid {
 		return false, fmt.Errorf("%s", e.reasoningUsage(efforts))
 	}
-	switcher.SetReasoningEffort(target)
-	return true, nil
+	return true, e.setDefaultReasoning(agent, target)
 }
 
 func (e *Engine) applyDefaultMode(agent Agent, args []string) (bool, error) {
@@ -274,7 +345,13 @@ func (e *Engine) defaultSettingsSummary(agent Agent, sessionKey string) string {
 			}
 		}
 	}
-	text += "\n\n" + e.i18n.Tf(MsgDefaultSettingsConfigured, value(model), value(effort), value(mode), value(provider)) + "\n\n" + e.i18n.T(MsgDefaultSettingsScope)
+	creationValue := func(v string) string {
+		if v == "" {
+			return e.i18n.T(MsgFollowServerDefault)
+		}
+		return v
+	}
+	text += "\n\n" + e.i18n.Tf(MsgDefaultSettingsConfigured, creationValue(model), creationValue(effort), value(mode), value(provider)) + "\n\n" + e.i18n.T(MsgDefaultSettingsScope)
 	if sw, ok := agent.(ApprovalDefaultSwitcher); ok {
 		text += "\n" + e.i18n.Tf(MsgNewApprovalState, sw.GetApprovalMode())
 	}
@@ -285,6 +362,10 @@ func (e *Engine) renderDefaultSettingsCard(agent Agent, sessionKey, command stri
 	if card := e.currentSessionSettingsCard(sessionKey, command, nil); card != nil {
 		return card
 	}
+	return e.renderCreationSettingsCard(agent, sessionKey, command)
+}
+
+func (e *Engine) renderCreationSettingsCard(agent Agent, sessionKey, command string) *Card {
 	title := map[string]MsgKey{"model": MsgCardTitleModel, "reasoning": MsgCardTitleReasoning, "mode": MsgCardTitleMode, "provider": MsgCardTitleProvider}[command]
 	card := NewCard().Title(e.i18n.T(title), "indigo").Markdown(e.defaultSettingsSummary(agent, sessionKey))
 	opts := []CardSelectOption{}
@@ -302,6 +383,10 @@ func (e *Engine) renderDefaultSettingsCard(agent Agent, sessionKey, command stri
 					current = p.Model
 				}
 			}
+			opts = append(opts, CardSelectOption{Text: e.i18n.T(MsgFollowServerDefault), Value: "act:/model reset-default"})
+			if current == "" {
+				selected = "act:/model reset-default"
+			}
 			for i, m := range models {
 				action := "act:/model switch " + m.Name
 				opts = append(opts, CardSelectOption{Text: fmt.Sprintf("%d. %s", i+1, m.Name), Value: action})
@@ -313,6 +398,10 @@ func (e *Engine) renderDefaultSettingsCard(agent Agent, sessionKey, command stri
 		}
 	case "reasoning":
 		if sw, ok := agent.(ReasoningEffortSwitcher); ok {
+			opts = append(opts, CardSelectOption{Text: e.i18n.T(MsgFollowServerDefault), Value: "act:/reasoning reset-default"})
+			if sw.GetReasoningEffort() == "" {
+				selected = "act:/reasoning reset-default"
+			}
 			for i, effort := range sw.AvailableReasoningEfforts() {
 				action := "act:/reasoning " + effort
 				opts = append(opts, CardSelectOption{Text: fmt.Sprintf("%d. %s", i+1, effort), Value: action})
@@ -385,11 +474,19 @@ func (e *Engine) defaultSettingsCardAction(command, args, sessionKey string) *Ca
 		return nil
 	}
 	command = strings.TrimPrefix(command, "/")
-	if card := e.currentSessionSettingsCard(sessionKey, command, strings.Fields(args)); card != nil {
-		return card
+	reset := resetsCreationDefault(command, strings.Fields(args))
+	if !reset {
+		if card := e.currentSessionSettingsCard(sessionKey, command, strings.Fields(args)); card != nil {
+			return card
+		}
 	}
 	changed, err := e.applyDefaultSetting(agent, sessionKey, e.interactiveKeyForSessionKey(sessionKey), command, strings.Fields(args))
 	card := e.renderDefaultSettingsCard(agent, sessionKey, command)
+	if reset && e.currentSettingsSession(sessionKey, command) != nil {
+		// Keep current-session controls scoped to the current session after
+		// a reset, while also showing which creation override was cleared.
+		card.Elements = append([]CardElement{CardMarkdown{Content: e.defaultSettingsSummary(agent, sessionKey)}}, card.Elements...)
+	}
 	if err != nil {
 		card.Elements = append([]CardElement{CardMarkdown{Content: e.i18n.Tf(MsgError, err)}}, card.Elements...)
 	} else if changed {

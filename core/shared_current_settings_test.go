@@ -69,6 +69,38 @@ func TestCurrentSettingsCardActionsChangeSessionAndPreserveDefaults(t *testing.T
 	assertSharedSettingsPreserved(t, env, as)
 }
 
+func TestCurrentSettingsMenusOnlyOfferServerChoices(t *testing.T) {
+	for _, command := range []string{"model", "reasoning"} {
+		t.Run(command, func(t *testing.T) {
+			env, _, as := newLiveSettingsEnv(t)
+			menu := env.e.handleCardNav("nav:/"+command, "test:user")
+			var values []string
+			for _, el := range menu.Elements {
+				if row, ok := el.(CardActions); ok {
+					for _, button := range row.Buttons {
+						if strings.Contains(button.Value, "reset-default") {
+							t.Fatal("attached menu offers a creation-default reset")
+						}
+					}
+				}
+				if sel, ok := el.(CardSelect); ok {
+					for _, option := range sel.Options {
+						values = append(values, option.Value)
+					}
+				}
+			}
+			want := []string{"act:/model switch server-model", "act:/model switch target-model"}
+			if command == "reasoning" {
+				want = []string{"act:/reasoning medium", "act:/reasoning extra high"}
+			}
+			if strings.Join(values, "|") != strings.Join(want, "|") {
+				t.Fatalf("menu choices differ from server list: %v, want %v", values, want)
+			}
+			assertSharedSettingsPreserved(t, env, as)
+		})
+	}
+}
+
 func TestCurrentSettingsInvalidChoicesPreserveCurrentSession(t *testing.T) {
 	env, _, as := newLiveSettingsEnv(t)
 	for _, action := range []string{"act:/model switch 999", "act:/reasoning invalid"} {

@@ -1111,6 +1111,15 @@ var messages = map[MsgKey]map[Language]string{
 		LangJapanese:           "変更は現在のセッションに適用され、接続中の他のクライアントにも共有されます。",
 		LangSpanish:            "Los cambios se aplican a esta sesión y se comparten con los demás clientes conectados.",
 	},
+
+	MsgFollowServerDefault: {
+		LangEnglish:            "Follow server default",
+		LangChinese:            "跟随服务端默认",
+		LangTraditionalChinese: "跟隨伺服器預設",
+		LangJapanese:           "サーバーの既定値に従う",
+		LangSpanish:            "Usar el valor predeterminado del servidor",
+	},
+
 	MsgDefaultSettingsSaved: {
 		LangEnglish:            "New-thread defaults updated; attached thread unchanged.",
 		LangChinese:            "已更新新建 thread 的默认配置；已接入 thread 未更改。",
@@ -5471,6 +5480,7 @@ const (
 	MsgSessionSettingsSaved       MsgKey = "session_settings_saved"
 	MsgSessionSettingsRuntime     MsgKey = "session_settings_runtime"
 	MsgSessionSettingsScope       MsgKey = "session_settings_scope"
+	MsgFollowServerDefault        MsgKey = "follow_server_default"
 	MsgDefaultSettingsSaved       MsgKey = "default_settings_settingssaved"
 	MsgDefaultSettingsRuntime     MsgKey = "default_settings_settingsruntime"
 	MsgDefaultSettingsConfigured  MsgKey = "default_settings_settingsconfigured"

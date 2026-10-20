@@ -3265,6 +3265,22 @@ func (*cujMultiwordEffortAgent) AvailableReasoningEfforts() []string {
 }
 
 func TestCUJ_C7_SharedSettingsPreserveLiveConversation(t *testing.T) {
+	t.Run("reset creation defaults without changing current session", func(t *testing.T) {
+		env, _, as := newLiveSettingsEnv(t)
+		env.send("/model")
+		env.await("Model: server-model · Reasoning: medium")
+		env.send("/model reset-default")
+		env.await("Model: Follow server default · Reasoning: low")
+		env.send("/reasoning reset-default")
+		env.await("Model: Follow server default · Reasoning: Follow server default")
+		env.send("/model")
+		env.await("Model: server-model · Reasoning: medium")
+		env.send("/history 10")
+		env.await("KEEP HISTORY")
+		as.emit(Event{Type: EventText, Content: "LIVE AFTER DEFAULT RESET", Metadata: map[string]any{"phase": "commentary"}})
+		env.await("LIVE AFTER DEFAULT RESET")
+	})
+
 	t.Run("native permission modes match shared service", func(t *testing.T) {
 		env := newNativePermissionEnv(t)
 		env.send("/mode")

@@ -886,6 +886,29 @@ func TestSaveAgentModel(t *testing.T) {
 	}
 }
 
+func TestSaveAgentReasoningEffort_SetAndResetPreservesModelAndComments(t *testing.T) {
+	writeTestConfig(t, providerConfigWithCommentsTOML)
+	if err := SaveAgentModel("demo", "selected-model"); err != nil {
+		t.Fatal(err)
+	}
+	for _, effort := range []string{"extra high", ""} {
+		if err := SaveAgentReasoningEffort("demo", effort); err != nil {
+			t.Fatal(err)
+		}
+		cfg := readTestConfig(t)
+		if got := cfg.Projects[0].Agent.Options["reasoning_effort"]; got != effort {
+			t.Fatalf("effort = %v, want %q", got, effort)
+		}
+		if cfg.Projects[0].Agent.Options["model"] != "selected-model" {
+			t.Fatal("saving effort changed model")
+		}
+		data, err := os.ReadFile(ConfigPath)
+		if err != nil || !strings.Contains(string(data), "# Very important - do not lose this!") {
+			t.Fatalf("config comments lost: %v", err)
+		}
+	}
+}
+
 const providerConfigWithCommentsTOML = `# This is my config file
 # Very important - do not lose this!
 custom_top = "keep_me"

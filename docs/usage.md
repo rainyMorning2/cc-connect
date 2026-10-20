@@ -2,6 +2,12 @@
 
 Complete guide to using cc-connect features.
 
+For Codex managed daemon and Kimi Web, the unattached model and reasoning menus include
+“Follow server default” to clear the corresponding new-session override. Attached-session menus only offer the server-reported choices. The text commands are `/model reset-default`
+and `/reasoning reset-default` (also `/effort reset-default`). Model and reasoning
+reset independently; permission settings are preserved. The cleared override is
+saved to configuration, and future sessions use the server's then-current default.
+
 ## Table of Contents
 
 - [Session Management](#session-management)

@@ -57,6 +57,94 @@ func (a *sharedSettingsTestAgent) GetModel() string        { a.mu.Lock(); defer 
 func (*sharedSettingsTestAgent) AvailableModels(context.Context) []ModelOption {
 	return []ModelOption{{Name: "default-model", Alias: "default"}, {Name: "new-model", Alias: "new"}}
 }
+
+type resetEffortSettingsAgent struct{ *sharedSettingsTestAgent }
+
+func (a *resetEffortSettingsAgent) SetModel(model string) {
+	a.sharedSettingsTestAgent.SetModel(model)
+	a.SetReasoningEffort("")
+}
+
+func TestCreationDefaults_ResetModelAndReasoningIndependently(t *testing.T) {
+	env, base, as := newSharedSettingsEnv(t)
+	a := &resetEffortSettingsAgent{base}
+	env.e.agent = a
+	a.SetProviders([]ProviderConfig{{Name: "default-provider", Model: "provider-model"}})
+	var savedModel, savedProvider, savedEffort []string
+	env.e.SetModelSaveFunc(func(v string) error { savedModel = append(savedModel, v); return nil })
+	env.e.providerModelSaveFunc = func(name, v string) error {
+		savedProvider = append(savedProvider, name+":"+v)
+		return nil
+	}
+	env.e.SetReasoningSaveFunc(func(v string) error { savedEffort = append(savedEffort, v); return nil })
+	card := env.e.handleCardNav("act:/model reset-default", "test:user")
+	if card == nil || !strings.Contains(card.RenderText(), "New-thread defaults updated") {
+		t.Fatalf("reset failed: %+v", card)
+	}
+	if a.GetModel() != "" || a.GetActiveProvider().Model != "" || a.GetReasoningEffort() != "low" {
+		t.Fatal("model reset did not clear effective override or changed effort")
+	}
+	if len(savedModel) != 1 || savedModel[0] != "" || len(savedProvider) != 1 || savedProvider[0] != "default-provider:" || len(savedEffort) != 0 {
+		t.Fatalf("incorrect model persistence: %v %v %v", savedModel, savedProvider, savedEffort)
+	}
+	a.SetModel("new-model")
+	a.SetReasoningEffort("high")
+	env.send("/reasoning reset-default")
+	if a.GetModel() != "new-model" || a.GetReasoningEffort() != "" || a.GetMode() != "suggest" {
+		t.Fatal("reasoning reset changed model or permission mode")
+	}
+	if len(savedEffort) != 1 || savedEffort[0] != "" {
+		t.Fatalf("reasoning reset not persisted: %v", savedEffort)
+	}
+	assertSharedSettingsPreserved(t, env, as)
+}
+
+func TestCreationDefaults_ResetSaveFailurePreservesSettings(t *testing.T) {
+	for _, command := range []string{"model", "reasoning"} {
+		t.Run(command, func(t *testing.T) {
+			env, a, as := newSharedSettingsEnv(t)
+			fail := func(string) error { return fmt.Errorf("cannot save default") }
+			env.e.SetModelSaveFunc(fail)
+			env.e.SetReasoningSaveFunc(fail)
+			card := env.e.handleCardNav("act:/"+command+" reset-default", "test:user")
+			if card == nil || !strings.Contains(card.RenderText(), "cannot save default") {
+				t.Fatalf("save failure hidden: %+v", card)
+			}
+			if a.GetModel() != "default-model" || a.GetReasoningEffort() != "low" {
+				t.Fatal("failed save changed defaults")
+			}
+			assertSharedSettingsPreserved(t, env, as)
+		})
+	}
+}
+
+func TestCreationDefaults_ServerDefaultMenuOptionAndSelection(t *testing.T) {
+	env, a, _ := newSharedSettingsEnv(t)
+	a.SetModel("")
+	a.SetReasoningEffort("")
+	for _, lang := range []Language{LangEnglish, LangChinese, LangTraditionalChinese, LangJapanese, LangSpanish} {
+		env.e.i18n.SetLang(lang)
+		for _, command := range []string{"model", "reasoning"} {
+			card := env.e.renderCreationSettingsCard(a, "test:user", command)
+			found := false
+			for _, el := range card.Elements {
+				if sel, ok := el.(CardSelect); ok {
+					if sel.InitValue != "act:/"+command+" reset-default" {
+						t.Fatalf("reset is not selected: %+v", sel)
+					}
+					for _, opt := range sel.Options {
+						if opt.Value == "act:/"+command+" reset-default" && opt.Text == env.e.i18n.T(MsgFollowServerDefault) {
+							found = true
+						}
+					}
+				}
+			}
+			if !found || env.e.i18n.T(MsgFollowServerDefault) == string(MsgFollowServerDefault) {
+				t.Fatalf("%s %s lacks translated reset option", lang, command)
+			}
+		}
+	}
+}
 func (a *sharedSettingsTestAgent) SetReasoningEffort(v string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()

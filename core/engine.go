@@ -376,6 +376,7 @@ type Engine struct {
 	providerRefsSaveFunc    func(refs []string) error
 	listGlobalProvidersFunc func(agentType string) ([]ProviderConfig, error)
 	modelSaveFunc           func(model string) error
+	reasoningSaveFunc       func(effort string) error
 
 	ttsSaveFunc func(mode string) error
 
@@ -1121,6 +1122,10 @@ func (e *Engine) SetListGlobalProvidersFunc(fn func(agentType string) ([]Provide
 
 func (e *Engine) SetModelSaveFunc(fn func(model string) error) {
 	e.modelSaveFunc = fn
+}
+
+func (e *Engine) SetReasoningSaveFunc(fn func(effort string) error) {
+	e.reasoningSaveFunc = fn
 }
 
 // AddPlatform appends a platform to the engine after construction.
