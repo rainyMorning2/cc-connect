@@ -53,7 +53,7 @@ cc-connect 完整功能使用指南。
 会话中 Agent 请求工具权限时，回复 **允许** / **拒绝** / **允许所有**。
 
 Codex managed daemon 和 Kimi Web 在未 attach 时的模型、思考等级菜单提供“跟随服务端默认”选项，
-分别清除对应的新会话默认设置。
+分别清除对应的新会话默认设置，并显示从服务端读取的默认模型和思考等级。
 已 attach 会话的菜单仅展示服务端返回的可选列表。也可使用 `/model reset-default` 和 `/reasoning reset-default`
 （或 `/effort reset-default`）。两个设置独立重置；权限模式保持原值。后续新会话使用服务端
 当时的默认值，清除结果会保存到配置中。

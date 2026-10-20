@@ -1111,7 +1111,27 @@ var messages = map[MsgKey]map[Language]string{
 		LangJapanese:           "変更は現在のセッションに適用され、接続中の他のクライアントにも共有されます。",
 		LangSpanish:            "Los cambios se aplican a esta sesión y se comparten con los demás clientes conectados.",
 	},
-
+	MsgServerDefaultsReported: {
+		LangEnglish:            "Server defaults (reported by server):\nModel: %s · Reasoning: %s",
+		LangChinese:            "服务端默认配置（服务端返回）：\n模型：%s · 推理强度：%s",
+		LangTraditionalChinese: "伺服器預設配置（伺服器回傳）：\n模型：%s · 推理強度：%s",
+		LangJapanese:           "サーバーの既定値（サーバーから取得）:\nモデル: %s · 推論: %s",
+		LangSpanish:            "Valores predeterminados (según el servidor):\nModelo: %s · Razonamiento: %s",
+	},
+	MsgServerDefaultsReadFailed: {
+		LangEnglish:            "Could not read server defaults: %s",
+		LangChinese:            "读取服务端默认配置失败：%s",
+		LangTraditionalChinese: "讀取伺服器預設配置失敗：%s",
+		LangJapanese:           "サーバーの既定値を取得できませんでした: %s",
+		LangSpanish:            "No se pudieron leer los valores del servidor: %s",
+	},
+	MsgServerDefaultNotReported: {
+		LangEnglish:            "not reported by server",
+		LangChinese:            "服务端未返回",
+		LangTraditionalChinese: "伺服器未回傳",
+		LangJapanese:           "サーバーから未報告",
+		LangSpanish:            "no informado por el servidor",
+	},
 	MsgFollowServerDefault: {
 		LangEnglish:            "Follow server default",
 		LangChinese:            "跟随服务端默认",
@@ -5480,6 +5500,9 @@ const (
 	MsgSessionSettingsSaved       MsgKey = "session_settings_saved"
 	MsgSessionSettingsRuntime     MsgKey = "session_settings_runtime"
 	MsgSessionSettingsScope       MsgKey = "session_settings_scope"
+	MsgServerDefaultsReported     MsgKey = "server_defaults_reported"
+	MsgServerDefaultsReadFailed   MsgKey = "server_defaults_read_failed"
+	MsgServerDefaultNotReported   MsgKey = "server_default_not_reported"
 	MsgFollowServerDefault        MsgKey = "follow_server_default"
 	MsgDefaultSettingsSaved       MsgKey = "default_settings_settingssaved"
 	MsgDefaultSettingsRuntime     MsgKey = "default_settings_settingsruntime"

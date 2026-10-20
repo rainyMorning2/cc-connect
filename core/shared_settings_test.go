@@ -14,6 +14,54 @@ type sharedSettingsTestAgent struct {
 	provider            string
 }
 
+type serverDefaultsSettingsAgent struct {
+	*sharedSettingsTestAgent
+	defaults   AgentRuntimeSettings
+	defaultErr error
+}
+
+func (a *serverDefaultsSettingsAgent) ReadDefaultSettings(context.Context) (AgentRuntimeSettings, error) {
+	return a.defaults, a.defaultErr
+}
+
+func TestDefaultSettingsSummary_UnattachedReadsServerDefaultsWithoutChangingOverrides(t *testing.T) {
+	env := newSharedTestEnv(t)
+	a := &serverDefaultsSettingsAgent{
+		sharedSettingsTestAgent: &sharedSettingsTestAgent{model: "override-model", effort: "high"},
+		defaults:                AgentRuntimeSettings{Model: "server-model", ReasoningEffort: "medium"},
+	}
+	env.e.agent = a
+	for _, command := range []string{"model", "reasoning"} {
+		text := env.e.renderDefaultSettingsCard(a, "test:user", command).RenderText()
+		for _, want := range []string{"No attached runtime", "Server defaults (reported by server)", "Model: server-model · Reasoning: medium", "Model: override-model · Reasoning: high"} {
+			if !strings.Contains(text, want) {
+				t.Fatalf("%s menu missing %q: %s", command, want, text)
+			}
+		}
+	}
+	if a.GetModel() != "override-model" || a.GetReasoningEffort() != "high" {
+		t.Fatal("reading defaults changed overrides")
+	}
+}
+
+func TestDefaultSettingsSummary_ServerFailureDoesNotFabricateDefaults(t *testing.T) {
+	env := newSharedTestEnv(t)
+	a := &serverDefaultsSettingsAgent{
+		sharedSettingsTestAgent: &sharedSettingsTestAgent{model: "override-model", effort: "high"},
+		defaultErr:              fmt.Errorf("service unavailable"),
+	}
+	env.e.agent = a
+	text := env.e.defaultSettingsSummary(a, "test:user")
+	if !strings.Contains(text, "Could not read server defaults: service unavailable") || strings.Contains(text, "Server defaults (reported by server)") {
+		t.Fatalf("server failure hidden or defaults fabricated: %s", text)
+	}
+	a.defaults.Model = "reported-model"
+	text = env.e.defaultSettingsSummary(a, "test:user")
+	if !strings.Contains(text, "Model: reported-model · Reasoning: not reported by server") || !strings.Contains(text, "service unavailable") {
+		t.Fatalf("partial defaults discarded or guessed: %s", text)
+	}
+}
+
 type sharedPermissionPresetTestAgent struct{ *sharedSettingsTestAgent }
 
 func (a *sharedPermissionPresetTestAgent) PermissionModes() []PermissionModeInfo {

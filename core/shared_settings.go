@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -327,6 +328,9 @@ func (e *Engine) defaultSettingsSummary(agent Agent, sessionKey string) string {
 			text = e.i18n.Tf(MsgDefaultSettingsRuntime, value(runtime.Model), value(runtime.ReasoningEffort), value(runtime.Provider), value(runtime.ApprovalPolicy), value(runtime.Sandbox))
 		}
 	}
+	if defaults := e.serverDefaultSettingsSummary(agent); defaults != "" {
+		text += "\n\n" + defaults
+	}
 	model, effort, mode, provider := "", "", "", ""
 	if sw, ok := agent.(ModelSwitcher); ok {
 		model = sw.GetModel()
@@ -354,6 +358,35 @@ func (e *Engine) defaultSettingsSummary(agent Agent, sessionKey string) string {
 	text += "\n\n" + e.i18n.Tf(MsgDefaultSettingsConfigured, creationValue(model), creationValue(effort), value(mode), value(provider)) + "\n\n" + e.i18n.T(MsgDefaultSettingsScope)
 	if sw, ok := agent.(ApprovalDefaultSwitcher); ok {
 		text += "\n" + e.i18n.Tf(MsgNewApprovalState, sw.GetApprovalMode())
+	}
+	return text
+}
+
+func (e *Engine) serverDefaultSettingsSummary(agent Agent) string {
+	reader, ok := agent.(AgentDefaultSettingsReader)
+	if !ok {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(e.ctx, 5*time.Second)
+	defer cancel()
+	settings, err := reader.ReadDefaultSettings(ctx)
+	var failure string
+	if err != nil {
+		slog.Warn("read server creation defaults", "agent", agent.Name(), "error", err)
+		failure = e.i18n.Tf(MsgServerDefaultsReadFailed, err)
+		if settings.Model == "" && settings.ReasoningEffort == "" {
+			return failure
+		}
+	}
+	value := func(v string) string {
+		if v == "" {
+			return e.i18n.T(MsgServerDefaultNotReported)
+		}
+		return v
+	}
+	text := e.i18n.Tf(MsgServerDefaultsReported, value(settings.Model), value(settings.ReasoningEffort))
+	if failure != "" {
+		text += "\n" + failure
 	}
 	return text
 }

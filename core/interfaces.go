@@ -856,6 +856,12 @@ type AgentRuntimeSettingsReader interface {
 	ReadRuntimeSettings(context.Context) (AgentRuntimeSettings, error)
 }
 
+// AgentDefaultSettingsReader reads server-owned creation defaults without
+// attaching to a session or applying CC Connect's creation overrides.
+type AgentDefaultSettingsReader interface {
+	ReadDefaultSettings(context.Context) (AgentRuntimeSettings, error)
+}
+
 // Session setting capabilities change the attached runtime, without closing
 // its observer or changing the agent's defaults for future sessions.
 type SessionModelSwitcher interface {

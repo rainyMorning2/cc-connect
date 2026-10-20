@@ -3265,6 +3265,24 @@ func (*cujMultiwordEffortAgent) AvailableReasoningEfforts() []string {
 }
 
 func TestCUJ_C7_SharedSettingsPreserveLiveConversation(t *testing.T) {
+	t.Run("unattached menus refresh service defaults without pinning them", func(t *testing.T) {
+		env := newSharedTestEnv(t)
+		a := &serverDefaultsSettingsAgent{
+			sharedSettingsTestAgent: &sharedSettingsTestAgent{},
+			defaults:                AgentRuntimeSettings{Model: "first-server-model", ReasoningEffort: "medium"},
+		}
+		env.e.agent = a
+		env.send("/model")
+		env.await("Model: first-server-model · Reasoning: medium")
+		env.send("/model switch new-model")
+		env.await("Model: new-model · Reasoning: Follow server default")
+		a.defaults = AgentRuntimeSettings{Model: "changed-server-model", ReasoningEffort: "low"}
+		env.send("/reasoning")
+		env.await("Model: changed-server-model · Reasoning: low")
+		env.send("/model reset-default")
+		env.await("Model: Follow server default · Reasoning: Follow server default")
+	})
+
 	t.Run("reset creation defaults without changing current session", func(t *testing.T) {
 		env, _, as := newLiveSettingsEnv(t)
 		env.send("/model")
