@@ -155,6 +155,7 @@ func (f *webFixture) serve(w http.ResponseWriter, r *http.Request) {
 			f.runtimeStatus["model"] = model
 		}
 		if effort, ok := config["thinking"].(string); ok {
+			f.snapshot.Session.AgentConfig.Thinking = effort
 			f.runtimeStatus["thinking_level"] = effort
 		}
 		if mode, ok := config["permission_mode"].(string); ok {

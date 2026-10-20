@@ -58,6 +58,14 @@ func TestWebSettings_ModelAndEffortDefaultsPreserveAttachedSession(t *testing.T)
 	if err != nil || settings.Model != "fixture-model" || settings.ReasoningEffort != "high" {
 		t.Fatalf("defaults overwrote current session settings: %+v, %v", settings, err)
 	}
+	f.mu.Lock()
+	for _, request := range f.requests {
+		if strings.Contains(request, "/profile") || request == "POST /api/v1/config" {
+			f.mu.Unlock()
+			t.Fatalf("defaults mutated existing/global settings: %s", request)
+		}
+	}
+	f.mu.Unlock()
 	created, err := f.agent.StartSession(context.Background(), "")
 	if err != nil {
 		t.Fatal(err)
@@ -72,10 +80,64 @@ func TestWebSettings_ModelAndEffortDefaultsPreserveAttachedSession(t *testing.T)
 	if config["model"] != "alternate-model" || config["thinking"] != "max" {
 		t.Fatalf("new session ignored selected defaults: %+v", config)
 	}
-	for _, request := range f.requests {
-		if strings.Contains(request, "/profile") || request == "POST /api/v1/config" {
-			t.Fatalf("defaults mutated existing/global settings: %s", request)
-		}
+}
+
+// The live server accepts agent_config during creation but can return an
+// empty profile. Without initialization, the first prompt uses server defaults.
+func TestWebStartSession_PreservesSelectedModelWhenCreateIgnoresAgentConfig(t *testing.T) {
+	f := newWebFixture(t)
+	f.agent.SetModel("alternate-model")
+	f.agent.SetReasoningEffort("max")
+	as, err := f.agent.StartSession(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer as.Close()
+	settings, err := as.(core.AgentRuntimeSettingsReader).ReadRuntimeSettings(context.Background())
+	if err != nil || settings.Model != "alternate-model" || settings.ReasoningEffort != "max" {
+		t.Fatalf("new session lost selected settings before first prompt: %+v, %v", settings, err)
+	}
+	body, err := as.(*webSession).promptBody("first-prompt", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if model, ok := body["model"]; ok && model != "alternate-model" {
+		t.Fatalf("first prompt overrides selected model with server default: %v", model)
+	}
+}
+
+func TestWebStartSession_RejectsUnconfirmedCreationSettings(t *testing.T) {
+	for _, failure := range []string{"http", "model", "thinking"} {
+		t.Run(failure, func(t *testing.T) {
+			f := newWebFixture(t)
+			f.agent.SetModel("alternate-model")
+			f.agent.SetReasoningEffort("max")
+			f.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/profile") {
+					if failure == "http" {
+						http.Error(w, "profile unavailable", http.StatusServiceUnavailable)
+						return
+					}
+					f.mu.Lock()
+					defer f.mu.Unlock()
+					record := f.snapshot.Session
+					record.AgentConfig.Model = "alternate-model"
+					record.AgentConfig.Thinking = "max"
+					if failure == "model" {
+						record.AgentConfig.Model = "fixture-model"
+					} else {
+						record.AgentConfig.Thinking = "low"
+					}
+					f.reply(w, record)
+					return
+				}
+				f.serve(w, r)
+			})
+			if as, err := f.agent.StartSession(context.Background(), ""); err == nil {
+				as.Close()
+				t.Fatal("created session despite unconfirmed settings")
+			}
+		})
 	}
 }
 

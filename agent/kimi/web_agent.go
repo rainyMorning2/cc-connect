@@ -167,6 +167,19 @@ func (a *webAgent) StartSession(ctx context.Context, id string) (core.AgentSessi
 	if r.ID == "" {
 		return nil, fmt.Errorf("kimi web: create returned no session ID")
 	}
+	// Some servers accept agent_config at creation but leave the stored
+	// profile empty. Initialize only this newly created session before its
+	// first prompt can fall back to the server's default model.
+	if r.AgentConfig.Model != model || (effort != "" && r.AgentConfig.Thinking != effort) {
+		id := r.ID
+		if err := a.api.request(ctx, "POST", webSessionPath(id)+"/profile", map[string]any{"agent_config": agentConfig}, &r); err != nil {
+			return nil, fmt.Errorf("kimi web: initialize new session profile: %w", err)
+		}
+		if r.ID != id || filepath.Clean(r.Metadata.Cwd) != workDir || r.AgentConfig.Model != model ||
+			(effort != "" && r.AgentConfig.Thinking != effort) {
+			return nil, fmt.Errorf("kimi web: new session profile settings not confirmed")
+		}
+	}
 	return a.attachSession(ctx, r.ID, workDir)
 }
 func (a *webAgent) AttachSession(ctx context.Context, id string) (core.AgentSession, error) {

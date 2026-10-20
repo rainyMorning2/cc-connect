@@ -99,7 +99,8 @@ func webSessionPath(id string) string { return "/api/v1/sessions/" + url.PathEsc
 
 type webRecord struct {
 	AgentConfig struct {
-		Model string `json:"model"`
+		Model    string `json:"model"`
+		Thinking string `json:"thinking"`
 	} `json:"agent_config"`
 	ID             string          `json:"id"`
 	Title          string          `json:"title"`
