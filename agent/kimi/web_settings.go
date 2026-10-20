@@ -18,6 +18,31 @@ var _ core.ReasoningEffortSwitcher = (*webAgent)(nil)
 var _ core.SessionIDValidator = (*webAgent)(nil)
 var _ core.SessionModelSwitcher = (*webSession)(nil)
 var _ core.SessionReasoningEffortSwitcher = (*webSession)(nil)
+var _ core.AgentDefaultSettingsReader = (*webAgent)(nil)
+
+func (a *webAgent) ReadDefaultSettings(ctx context.Context) (core.AgentRuntimeSettings, error) {
+	var config struct {
+		Model      string `json:"default_model"`
+		Permission string `json:"default_permission_mode"`
+		Thinking   struct {
+			Enabled *bool  `json:"enabled"`
+			Effort  string `json:"effort"`
+		} `json:"thinking"`
+		Models map[string]struct {
+			DefaultEffort string `json:"defaultEffort"`
+		} `json:"models"`
+	}
+	if err := a.api.request(ctx, "GET", "/api/v1/config", nil, &config); err != nil {
+		return core.AgentRuntimeSettings{}, fmt.Errorf("kimi web: read server defaults: %w", err)
+	}
+	effort := config.Thinking.Effort
+	if config.Thinking.Enabled != nil && !*config.Thinking.Enabled {
+		effort = "off"
+	} else if effort == "" {
+		effort = config.Models[config.Model].DefaultEffort
+	}
+	return core.AgentRuntimeSettings{Model: config.Model, ReasoningEffort: effort, PermissionMode: config.Permission}, nil
+}
 
 type webModel struct {
 	Model   string   `json:"model"`

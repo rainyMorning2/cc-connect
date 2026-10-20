@@ -13,6 +13,57 @@ import (
 	"github.com/chenhg5/cc-connect/core"
 )
 
+func TestWebDefaultSettings_ReadsServerConfigWithoutSessionOrOverrides(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		thinking     map[string]any
+		modelDefault string
+		want         string
+	}{
+		{"configured", map[string]any{"enabled": true, "effort": "medium"}, "low", "medium"},
+		{"disabled", map[string]any{"enabled": false, "effort": "high"}, "medium", "off"},
+		{"model default", map[string]any{"enabled": true}, "low", "low"},
+		{"not reported", nil, "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newWebFixture(t)
+			f.agent.SetModel("alternate-model")
+			f.agent.SetReasoningEffort("max")
+			f.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != "GET" || r.URL.Path != "/api/v1/config" {
+					t.Errorf("unexpected default-settings request: %s %s", r.Method, r.URL.Path)
+					http.Error(w, "unexpected request", 500)
+					return
+				}
+				f.reply(w, map[string]any{
+					"default_model": "server-model", "default_permission_mode": "manual",
+					"thinking": tc.thinking,
+					"models":   map[string]any{"server-model": map[string]any{"defaultEffort": tc.modelDefault}},
+				})
+			})
+			settings, err := f.agent.ReadDefaultSettings(context.Background())
+			if err != nil || settings.Model != "server-model" || settings.ReasoningEffort != tc.want {
+				t.Fatalf("incorrect server defaults: %+v, %v", settings, err)
+			}
+			if f.agent.GetModel() != "alternate-model" || f.agent.GetReasoningEffort() != "max" {
+				t.Fatal("reading server defaults mutated overrides")
+			}
+		})
+	}
+}
+
+func TestWebDefaultSettings_ConfigFailureDoesNotReturnLocalOverrides(t *testing.T) {
+	f := newWebFixture(t)
+	f.agent.SetModel("alternate-model")
+	f.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "unavailable", http.StatusServiceUnavailable)
+	})
+	settings, err := f.agent.ReadDefaultSettings(context.Background())
+	if err == nil || settings.Model != "" || settings.ReasoningEffort != "" {
+		t.Fatalf("failure replaced with fabricated defaults: %+v, %v", settings, err)
+	}
+}
+
 func TestWebSettings_ModelAndEffortDefaultsPreserveAttachedSession(t *testing.T) {
 	f := newWebFixture(t)
 	f.mu.Lock()
@@ -138,6 +189,29 @@ func TestWebStartSession_RejectsUnconfirmedCreationSettings(t *testing.T) {
 				t.Fatal("created session despite unconfirmed settings")
 			}
 		})
+	}
+}
+
+func TestWebDefaults_ResetUsesServerModelAndDoesNotOverrideEffort(t *testing.T) {
+	f := newWebFixture(t)
+	f.agent.SetModel("alternate-model")
+	f.agent.SetReasoningEffort("max")
+	p := &webWorkspacePlatform{}
+	e := core.NewEngine("reset", f.agent, []core.Platform{p}, filepath.Join(t.TempDir(), "sessions.json"), core.LangEnglish)
+	defer e.Stop()
+	for _, command := range []string{"/model reset-default", "/reasoning reset-default"} {
+		e.ReceiveMessage(p, &core.Message{SessionKey: "test:user", Platform: "test", UserID: "user", Content: command, ReplyCtx: "user"})
+	}
+	as, err := f.agent.StartSession(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer as.Close()
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	config := f.creates[0]["agent_config"].(map[string]any)
+	if config["model"] != "fixture-model" || config["thinking"] != nil {
+		t.Fatalf("reset retained selected overrides: %v", config)
 	}
 }
 
