@@ -2543,6 +2543,7 @@ func TestCmdAction_SharedInteractiveTimeoutClaimsCallback(t *testing.T) {
 		t.Fatal(err)
 	}
 	ip := platformAny.(*interactivePlatform)
+	ip.SetI18n(core.NewI18n(core.LangJapanese))
 	seen := make(chan struct{}, 1)
 	ip.handler = func(_ core.Platform, _ *core.Message) { seen <- struct{}{} }
 	resp, err := ip.onCardAction(&callback.CardActionTriggerEvent{Event: &callback.CardActionTriggerRequest{
@@ -2552,6 +2553,9 @@ func TestCmdAction_SharedInteractiveTimeoutClaimsCallback(t *testing.T) {
 	}})
 	if err != nil || resp == nil || resp.Toast == nil || resp.Card != nil {
 		t.Fatalf("timeout response = %#v, err = %v; want a toast that claims the callback", resp, err)
+	}
+	if resp.Toast.Content != core.NewI18n(core.LangJapanese).T(core.MsgActionProcessing) {
+		t.Fatalf("unlocalized timeout toast: %q", resp.Toast.Content)
 	}
 	select {
 	case <-seen:
@@ -2602,5 +2606,17 @@ func TestCmdAction_WithAfterClick_SessionKeyRoutes(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("expected command to be dispatched with correct session key")
+	}
+}
+
+func TestActionProcessingText_FollowsLanguageChanges(t *testing.T) {
+	p := &Platform{}
+	i := core.NewI18n(core.LangEnglish)
+	p.SetI18n(i)
+	for _, lang := range []core.Language{core.LangEnglish, core.LangChinese, core.LangTraditionalChinese, core.LangJapanese, core.LangSpanish} {
+		i.SetLang(lang)
+		if got := p.actionProcessingText(); got != i.T(core.MsgActionProcessing) || got == string(core.MsgActionProcessing) {
+			t.Fatalf("language=%s text=%s", lang, got)
+		}
 	}
 }

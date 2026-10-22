@@ -1406,6 +1406,34 @@ var messages = map[MsgKey]map[Language]string{
 		LangJapanese:           "モデル使用量のお知らせ",
 		LangSpanish:            "Aviso de uso del modelo",
 	},
+	MsgSharedMultiAnswerHint: {
+		LangEnglish:            "Select one or more options (e.g. 1,2); select again to remove. Type done or press Submit answers to send. /skip skips this request.",
+		LangChinese:            "选择一项或多项（如 1,2），再次选择可取消。回复 done 或点击“提交答案”后发送。/skip 跳过问答。",
+		LangTraditionalChinese: "選擇一項或多項（如 1,2），再次選擇可取消。回覆 done 或點擊「提交答案」後送出。/skip 跳過問答。",
+		LangJapanese:           "複数選択できます（例：1,2）。再選択で解除。done または「回答を送信」で確定します。/skip でスキップ。",
+		LangSpanish:            "Selecciona una o varias opciones (p. ej. 1,2); repite para quitar. Escribe done o pulsa Enviar respuestas. /skip omite la solicitud.",
+	},
+	MsgSharedSelectedAnswers: {
+		LangEnglish:            "Selected: %s",
+		LangChinese:            "已选择：%s",
+		LangTraditionalChinese: "已選擇：%s",
+		LangJapanese:           "選択済み：%s",
+		LangSpanish:            "Seleccionadas: %s",
+	},
+	MsgSharedSubmitAnswers: {
+		LangEnglish:            "Submit answers",
+		LangChinese:            "提交答案",
+		LangTraditionalChinese: "提交答案",
+		LangJapanese:           "回答を送信",
+		LangSpanish:            "Enviar respuestas",
+	},
+	MsgActionProcessing: {
+		LangEnglish:            "⏳ Processing…",
+		LangChinese:            "⏳ 正在处理…",
+		LangTraditionalChinese: "⏳ 正在處理…",
+		LangJapanese:           "⏳ 処理中…",
+		LangSpanish:            "⏳ Procesando…",
+	},
 	MsgSharedAnswerHint: {
 		LangEnglish:            "Choose an option number or type your answer. /skip skips this request.",
 		LangChinese:            "回复选项序号或答案文本。/skip 跳过这次问答。",
@@ -5473,6 +5501,10 @@ const (
 	MsgSharedReconnected          MsgKey = "shared_reconnected"
 	MsgSharedCancelDecision       MsgKey = "shared_canceldecision"
 	MsgSharedDecisionHint         MsgKey = "shared_decisionhint"
+	MsgSharedMultiAnswerHint      MsgKey = "sharedmultianswerhint"
+	MsgSharedSelectedAnswers      MsgKey = "sharedselectedanswers"
+	MsgSharedSubmitAnswers        MsgKey = "sharedsubmitanswers"
+	MsgActionProcessing           MsgKey = "actionprocessing"
 	MsgSharedAnswerHint           MsgKey = "shared_answerhint"
 	MsgSharedSkip                 MsgKey = "shared_skip"
 	MsgSharedStaleRequest         MsgKey = "shared_stalerequest"

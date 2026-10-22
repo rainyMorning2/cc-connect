@@ -2679,6 +2679,29 @@ func TestCUJ_H5_WorkspaceSkillDiscoveryAndInvocation(t *testing.T) {
 // CUJ: connect to externally started work, answer its questions, and detach.
 // Request-bound buttons remain safe when another client resolves an approval.
 func TestCUJ_C7_SharedExternalApprovalQuestionsAndDetach(t *testing.T) {
+	t.Run("MultiSelectAndOtherAnswers", func(t *testing.T) {
+		env := newSharedTestEnv(t)
+		plain := &stubPlatformEngine{n: "test"}
+		send := func(text string) {
+			env.e.ReceiveMessage(plain, &Message{SessionKey: "test:user", Platform: "test", UserID: "user", Content: text, ReplyCtx: "reply"})
+		}
+		send("/attach first")
+		as := env.a.connection("first")
+		as.emit(Event{Type: EventPermissionRequest, RequestID: "question", Questions: []UserQuestion{{ID: "q", Question: "Choose features", MultiSelect: true, IsOther: true, Options: []UserQuestionOption{{Label: "A"}, {Label: "B"}}}}})
+		waitSharedPlainText(t, plain, "Choose features")
+		send("1,2")
+		waitSharedPlainText(t, plain, "Selected: A, B")
+		send("custom feature")
+		waitSharedPlainText(t, plain, "Selected: A, B, custom feature")
+		if strings.Contains(strings.Join(plain.getSent(), "\n"), env.e.i18n.T(MsgSharedResponseSent)) {
+			t.Fatal("answer sent before confirmation")
+		}
+		send("done")
+		waitSharedPlainText(t, plain, env.e.i18n.T(MsgSharedResponseSent))
+		send("/detach")
+		waitSharedPlainText(t, plain, env.e.i18n.T(MsgSharedDetached))
+	})
+
 	t.Run("FinalAnswerAppearsAfterApproval", func(t *testing.T) {
 		p := &approvalFinalTestPlatform{enabled: true}
 		p.n = "test"

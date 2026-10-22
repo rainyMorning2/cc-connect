@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -394,6 +393,7 @@ func (e *Engine) sendSharedPrompt(state *interactiveState, pending *pendingPermi
 		DecisionDetails: pending.DecisionDetails,
 		Questions:       append([]UserQuestion(nil), pending.Questions...),
 		CurrentQuestion: pending.CurrentQuestion,
+		MultiAnswers:    cloneSharedMultiAnswers(pending.MultiAnswers),
 	}
 	state.mu.Unlock()
 	pending = &snapshot
@@ -427,50 +427,6 @@ func (e *Engine) sendSharedPrompt(state *interactiveState, pending *pendingPermi
 		return
 	}
 	e.send(p, reply, text+"\n"+e.i18n.Tf(MsgSharedDecisionHint, strings.Join(pending.Decisions, " / ")))
-}
-
-func (e *Engine) sendSharedQuestionPrompt(p Platform, reply any, pending *pendingPermission) {
-	index := pending.CurrentQuestion
-	if index < 0 || index >= len(pending.Questions) {
-		return
-	}
-	q := pending.Questions[index]
-	text := fmt.Sprintf("(%d/%d) %s", index+1, len(pending.Questions), q.Question)
-	buttons := []ButtonOption{}
-	cardButtons := []CardButton{}
-	for i, opt := range q.Options {
-		text += fmt.Sprintf("\n%d. %s", i+1, opt.Label)
-		if opt.Description != "" {
-			text += " — " + opt.Description
-		}
-		action := fmt.Sprintf("cmd:/answer %s %d %d", pending.ActionToken, index, i+1)
-		buttons = append(buttons, ButtonOption{Text: opt.Label, Data: action})
-		cardButtons = append(cardButtons, CardButton{Text: opt.Label, Value: action, Type: "default"})
-	}
-	text += "\n" + e.i18n.T(MsgSharedAnswerHint)
-	skip := ButtonOption{Text: e.i18n.T(MsgSharedSkip), Data: "cmd:/skip " + pending.ActionToken}
-	buttons = append(buttons, skip)
-	cardButtons = append(cardButtons, CardButton{Text: skip.Text, Value: skip.Data, Type: "default"})
-	if bs, ok := p.(InlineButtonSender); ok {
-		rows := [][]ButtonOption{}
-		for _, button := range buttons {
-			rows = append(rows, []ButtonOption{button})
-		}
-		if err := bs.SendWithButtons(e.ctx, reply, text, rows); err == nil {
-			return
-		} else {
-			slog.Warn("shared question buttons", "project", e.name, "platform", p.Name(), "request_id", pending.RequestID, "error", err)
-		}
-	}
-	if supportsCards(p) {
-		card := NewCard().Title(e.i18n.T(MsgAskQuestionTitle), "blue").Markdown(text)
-		for _, button := range cardButtons {
-			card.Buttons(button)
-		}
-		e.sendWithCard(p, reply, card.Build())
-		return
-	}
-	e.send(p, reply, text)
 }
 
 func (e *Engine) handleSharedPending(p Platform, msg *Message, content, key string) bool {
@@ -552,65 +508,4 @@ func (e *Engine) respondSharedDecision(p Platform, msg *Message, state *interact
 	if msg.CardActionResult == nil && !pending.card.wasUpdated() {
 		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgSharedResponseSent))
 	}
-}
-
-func (e *Engine) answerSharedQuestion(p Platform, msg *Message, state *interactiveState, pending *pendingPermission, token string, index int, content string) {
-	state.mu.Lock()
-	if state.pending != pending || (token != "" && token != pending.ActionToken) || (index >= 0 && index != pending.CurrentQuestion) {
-		state.mu.Unlock()
-		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgSharedStaleRequest))
-		return
-	}
-	current := pending.CurrentQuestion
-	if current < 0 || current >= len(pending.Questions) {
-		state.mu.Unlock()
-		return
-	}
-	q := pending.Questions[current]
-	answer := strings.TrimSpace(content)
-	if answer == "" {
-		state.mu.Unlock()
-		return
-	}
-	if choice, err := strconv.Atoi(answer); err == nil && choice >= 1 && choice <= len(q.Options) {
-		answer = q.Options[choice-1].Label
-	}
-	if !q.IsOther && len(q.Options) > 0 {
-		matched := false
-		for _, opt := range q.Options {
-			if answer == opt.Label {
-				matched = true
-			}
-		}
-		if !matched {
-			state.mu.Unlock()
-			e.reply(p, msg.ReplyCtx, e.i18n.T(MsgSharedAnswerHint))
-			return
-		}
-	}
-	if pending.Answers == nil {
-		pending.Answers = map[int]string{}
-	}
-	pending.Answers[current] = answer
-	if current+1 < len(pending.Questions) {
-		pending.CurrentQuestion++
-		state.mu.Unlock()
-		e.sendSharedPrompt(state, pending)
-		return
-	}
-	answers := map[string]any{}
-	for i, q := range pending.Questions {
-		answers[q.ID] = []string{pending.Answers[i]}
-	}
-	as := state.agentSession
-	state.mu.Unlock()
-	if as == nil {
-		return
-	}
-	if err := as.RespondPermission(pending.RequestID, PermissionResult{Behavior: "allow", UpdatedInput: map[string]any{"answers": answers}}); err != nil {
-		e.reply(p, msg.ReplyCtx, e.i18n.Tf(MsgError, err))
-		return
-	}
-	e.resolveSharedPending(state, pending.RequestID)
-	e.reply(p, msg.ReplyCtx, e.i18n.T(MsgSharedResponseSent))
 }

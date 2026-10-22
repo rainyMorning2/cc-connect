@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -116,6 +117,7 @@ type replyContext struct {
 }
 
 type Platform struct {
+	i18n                       atomic.Pointer[core.I18n]
 	mu                         sync.RWMutex
 	platformName               string
 	domain                     string
@@ -925,7 +927,7 @@ func (p *Platform) onCardAction(event *callback.CardActionTriggerEvent) (*callba
 				return &callback.CardActionTriggerResponse{
 					Toast: &callback.Toast{
 						Type:    "info",
-						Content: "⏳ Loading... / 加载中...",
+						Content: p.actionProcessingText(),
 					},
 				}, nil
 			}
@@ -1057,7 +1059,7 @@ func (p *Platform) onCardAction(event *callback.CardActionTriggerEvent) (*callba
 				}()
 				// A non-nil response also tells the shared connection that this
 				// platform handled the action; another sibling must not replay it.
-				return &callback.CardActionTriggerResponse{Toast: &callback.Toast{Type: "info", Content: "⏳ Loading... / 加载中..."}}, nil
+				return &callback.CardActionTriggerResponse{Toast: &callback.Toast{Type: "info", Content: p.actionProcessingText()}}, nil
 			}
 		}
 		go p.dispatchCoreMessage(msg)
@@ -7648,4 +7650,15 @@ func (p *Platform) SetPreviewStatus(previewHandle any, status core.CardStatus) {
 	if !resp.Success() {
 		slog.Debug("feishu: set preview status patch failed", "code", resp.Code, "msg", resp.Msg)
 	}
+}
+
+// SetI18n is safe during platform initialization and concurrent callbacks.
+func (p *Platform) SetI18n(i *core.I18n) { p.i18n.Store(i) }
+
+func (p *Platform) actionProcessingText() string {
+	i := p.i18n.Load()
+	if i == nil {
+		i = core.NewI18n(core.LangEnglish)
+	}
+	return i.T(core.MsgActionProcessing)
 }

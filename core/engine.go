@@ -732,10 +732,11 @@ type pendingPermission struct {
 	ToolName        string
 	ToolInput       map[string]any
 	InputPreview    string
-	Questions       []UserQuestion // non-nil for AskUserQuestion
-	Answers         map[int]string // collected answers keyed by question index
-	CurrentQuestion int            // index of the question currently being asked
-	Resolved        chan struct{}  // closed when user responds
+	Questions       []UserQuestion   // non-nil for AskUserQuestion
+	Answers         map[int]string   // collected answers keyed by question index
+	MultiAnswers    map[int][]string // shared multi-select answers, protected by interactiveState.mu
+	CurrentQuestion int              // index of the question currently being asked
+	Resolved        chan struct{}    // closed when user responds
 	resolveOnce     sync.Once
 	card            *permissionCardState // optional; only shared approvals with editable cards
 }
@@ -2522,6 +2523,9 @@ func (e *Engine) markPlatformUnavailable(p Platform) bool {
 }
 
 func (e *Engine) initPlatformCapabilities(p Platform) {
+	if localized, ok := p.(PlatformI18nSetter); ok {
+		localized.SetI18n(e.i18n)
+	}
 	if registrar, ok := p.(CommandRegistrar); ok {
 		commands, skillsOmitted := e.menuCommandsForPlatform(p.Name())
 		if skillsOmitted && strings.EqualFold(p.Name(), "telegram") {

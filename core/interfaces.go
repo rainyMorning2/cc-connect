@@ -873,3 +873,9 @@ type SessionReasoningEffortSwitcher interface {
 	CurrentReasoningEfforts(context.Context) ([]string, error)
 	SetCurrentReasoningEffort(context.Context, string) error
 }
+
+// PlatformI18nSetter supplies the engine's live language selection for platform
+// callbacks that must respond before command processing finishes.
+type PlatformI18nSetter interface {
+	SetI18n(*I18n)
+}
