@@ -34,6 +34,7 @@ type managedThread struct {
 	Turns                []managedTurn   `json:"turns"`
 }
 type managedSnapshot struct {
+	TurnsBackwardsCursor    string          `json:"turnsBackwardsCursor"`
 	Thread                  managedThread   `json:"thread"`
 	Cwd                     string          `json:"cwd"`
 	Model                   string          `json:"model"`
@@ -102,7 +103,7 @@ func newManagedSession(ctx context.Context, a *managedAgent, id string) (*manage
 	s.rpc = rpc
 	var snapshot managedSnapshot
 	if id != "" {
-		err = rpc.request(lifetime, "thread/resume", map[string]any{"threadId": id}, &snapshot)
+		snapshot, err = s.resumeSnapshot(rpc, id)
 	} else {
 		err = rpc.request(lifetime, "thread/start", a.newThreadParams(), &snapshot)
 	}
@@ -161,15 +162,10 @@ func (s *managedSession) applySnapshot(snapshot managedSnapshot, expected string
 	if cwd == "" {
 		cwd = snapshot.Thread.Cwd
 	}
-	if id == "" || (expected != "" && id != expected) {
-		return fmt.Errorf("snapshot returned a different or empty thread ID")
+	if err := s.validateSnapshot(snapshot, expected); err != nil {
+		return err
 	}
-	if !sameManagedCwd(s.agent.GetWorkDir(), cwd) {
-		return fmt.Errorf("thread is outside configured work_dir")
-	}
-	if managedSubagent(snapshot.Thread.Source) {
-		return fmt.Errorf("only root threads can be attached")
-	}
+
 	s.mu.Lock()
 	previousTurn := s.turn
 	s.thread = id
@@ -281,7 +277,7 @@ func (s *managedSession) reconnect() (*daemonRPC, error) {
 		}
 		var snapshot managedSnapshot
 		id := s.CurrentSessionID()
-		err = rpc.request(s.ctx, "thread/resume", map[string]any{"threadId": id}, &snapshot)
+		snapshot, err = s.resumeSnapshot(rpc, id)
 		if err == nil {
 			err = s.applySnapshot(snapshot, id, rpc)
 		}

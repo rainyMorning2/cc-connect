@@ -15,7 +15,7 @@ import (
 func TestManagedCurrentPermissionMode_ReportsServerRejection(t *testing.T) {
 	cwd := t.TempDir()
 	socket := managedFixture(t, func(ws *websocket.Conn) {
-		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+		fixtureRPCWithEmptyHistory(t, ws, func(m daemonMessage) (any, bool) {
 			if m.Method == "thread/resume" {
 				return fixtureSnapshot(cwd, "target", ""), true
 			}
@@ -64,7 +64,7 @@ func TestManagedCurrentPermissionMode_UpdatesOnlyAttachedThread(t *testing.T) {
 			var mu sync.Mutex
 			var update map[string]any
 			socket := managedFixture(t, func(ws *websocket.Conn) {
-				fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+				fixtureRPCWithEmptyHistory(t, ws, func(m daemonMessage) (any, bool) {
 					mu.Lock()
 					defer mu.Unlock()
 					switch m.Method {
@@ -145,7 +145,7 @@ func TestManagedApprovalFlow_PreservesCustomProfile(t *testing.T) {
 	reviewer := "user"
 	updates := 0
 	socket := managedFixture(t, func(ws *websocket.Conn) {
-		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+		fixtureRPCWithEmptyHistory(t, ws, func(m daemonMessage) (any, bool) {
 			mu.Lock()
 			defer mu.Unlock()
 			switch m.Method {

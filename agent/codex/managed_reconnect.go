@@ -19,19 +19,7 @@ func (s *managedSession) reconcileReconnect(snapshot managedSnapshot, expected s
 		return nil
 	}
 	turn := findManagedTurn(snapshot.Thread.Turns, expected)
-	if turn == nil {
-		var response struct {
-			Thread managedThread `json:"thread"`
-		}
-		if err := rpc.request(s.ctx, "thread/read", map[string]any{"threadId": snapshot.Thread.ID, "includeTurns": true}, &response); err != nil {
-			return fmt.Errorf("reconcile disconnected turn %s: %w", expected, err)
-		}
-		if response.Thread.ID != snapshot.Thread.ID || !sameManagedCwd(s.agent.GetWorkDir(), response.Thread.Cwd) {
-			return fmt.Errorf("reconnect reconciliation returned a different thread/workspace")
-		}
-		s.reconcileSubagents(response.Thread.Turns)
-		turn = findManagedTurn(response.Thread.Turns, expected)
-	}
+
 	if turn == nil {
 		return fmt.Errorf("reconnect could not locate unfinished turn %s", expected)
 	}

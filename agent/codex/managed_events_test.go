@@ -14,7 +14,7 @@ import (
 func TestManagedItemConversionPreservesTurnAndExternalUserInput(t *testing.T) {
 	cwd := t.TempDir()
 	socket := managedFixture(t, func(ws *websocket.Conn) {
-		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+		fixtureRPCWithEmptyHistory(t, ws, func(m daemonMessage) (any, bool) {
 			if m.Method == "thread/resume" {
 				_ = ws.WriteJSON(map[string]any{"id": m.ID, "result": fixtureSnapshot(cwd, "target", "")})
 				for _, item := range []map[string]any{{"id": "user", "type": "userMessage", "content": []any{map[string]any{"type": "text", "text": "CLI QUESTION"}}}, {"id": "tool", "type": "commandExecution", "command": "echo fixture", "status": "completed", "aggregatedOutput": "FIXTURE OUTPUT", "exitCode": 0}} {
@@ -45,7 +45,7 @@ func TestManagedRequestsPreserveTypedIDsChoicesAndStableQuestionIDs(t *testing.T
 	cwd := t.TempDir()
 	sent := make(chan daemonMessage, 8)
 	socket := managedFixture(t, func(ws *websocket.Conn) {
-		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+		fixtureRPCWithEmptyHistory(t, ws, func(m daemonMessage) (any, bool) {
 			if m.Method == "thread/resume" {
 				_ = ws.WriteJSON(map[string]any{"id": m.ID, "result": fixtureSnapshot(cwd, "target", "turn")})
 				_ = ws.WriteJSON(map[string]any{"id": 12, "method": "item/commandExecution/requestApproval", "params": map[string]any{"threadId": "target", "turnId": "turn", "command": "print marker", "availableDecisions": []string{"accept", "cancel"}}})
@@ -103,7 +103,7 @@ func TestManagedRequestsPreserveTypedIDsChoicesAndStableQuestionIDs(t *testing.T
 func TestManagedSteerInterruptLiveOutputAndExternalResolution(t *testing.T) {
 	cwd := t.TempDir()
 	socket := managedFixture(t, func(ws *websocket.Conn) {
-		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+		fixtureRPCWithEmptyHistory(t, ws, func(m daemonMessage) (any, bool) {
 			switch m.Method {
 			case "thread/resume":
 				_ = ws.WriteJSON(map[string]any{"id": m.ID, "result": fixtureSnapshot(cwd, "target", "turn")})
@@ -208,7 +208,7 @@ func TestManagedPatchApproval_ShowsProposedChangesWithoutReason(t *testing.T) {
 func TestManagedAsyncTextAndToolOutputRemainDistinct(t *testing.T) {
 	cwd := t.TempDir()
 	socket := managedFixture(t, func(ws *websocket.Conn) {
-		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+		fixtureRPCWithEmptyHistory(t, ws, func(m daemonMessage) (any, bool) {
 			if m.Method != "thread/resume" {
 				t.Errorf("unexpected method %s", m.Method)
 				return nil, false

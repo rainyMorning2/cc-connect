@@ -30,7 +30,7 @@ func TestManagedDefaultSettings_ReadsScopedServerDefaultsWithoutThread(t *testin
 		t.Run(tc.name, func(t *testing.T) {
 			cwd := t.TempDir()
 			socket := managedFixture(t, func(ws *websocket.Conn) {
-				fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+				fixtureRPCWithEmptyHistory(t, ws, func(m daemonMessage) (any, bool) {
 					switch m.Method {
 					case "config/read":
 						var params map[string]any
@@ -70,7 +70,7 @@ func TestManagedCurrentModelAndEffort_UpdateAttachedThreadWithoutChangingDefault
 	model, effort := "server-model", "medium"
 	var updates []map[string]any
 	socket := managedFixture(t, func(ws *websocket.Conn) {
-		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+		fixtureRPCWithEmptyHistory(t, ws, func(m daemonMessage) (any, bool) {
 			mu.Lock()
 			defer mu.Unlock()
 			switch m.Method {
@@ -147,7 +147,7 @@ func TestManagedCurrentModelAndEffort_UpdateAttachedThreadWithoutChangingDefault
 func TestManagedCurrentModelAndEffort_RejectBusyAndSurfaceServerErrors(t *testing.T) {
 	cwd := t.TempDir()
 	socket := managedFixture(t, func(ws *websocket.Conn) {
-		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+		fixtureRPCWithEmptyHistory(t, ws, func(m daemonMessage) (any, bool) {
 			if m.Method == "thread/resume" {
 				return fixtureSnapshot(cwd, "target", ""), true
 			}
@@ -192,7 +192,7 @@ func TestManagedCurrentModelAndEffort_RejectBusyAndSurfaceServerErrors(t *testin
 func TestManagedCurrentModel_RequiresServerConfirmation(t *testing.T) {
 	cwd := t.TempDir()
 	socket := managedFixture(t, func(ws *websocket.Conn) {
-		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+		fixtureRPCWithEmptyHistory(t, ws, func(m daemonMessage) (any, bool) {
 			if m.Method == "thread/resume" {
 				snapshot := fixtureSnapshot(cwd, "target", "")
 				snapshot["model"] = "unchanged-model"
@@ -282,7 +282,7 @@ func TestManagedLiveCurrentModelAndEffort(t *testing.T) {
 func TestManagedDefaults_ModelAndEffortOptionsComeFromDaemon(t *testing.T) {
 	cwd := t.TempDir()
 	socket := managedFixture(t, func(ws *websocket.Conn) {
-		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+		fixtureRPCWithEmptyHistory(t, ws, func(m daemonMessage) (any, bool) {
 			switch m.Method {
 			case "config/read":
 				var params map[string]any

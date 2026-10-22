@@ -118,7 +118,7 @@ func TestManagedSubagents_SnapshotReconcilesLatestWithoutHistoricalReplay(t *tes
 func TestManagedSubagents_DaemonEventsReachSharedNotice(t *testing.T) {
 	cwd := t.TempDir()
 	socket := managedFixture(t, func(ws *websocket.Conn) {
-		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+		fixtureRPCWithEmptyHistory(t, ws, func(m daemonMessage) (any, bool) {
 			if m.Method != "thread/resume" {
 				return nil, false
 			}
@@ -156,7 +156,7 @@ func TestManagedSubagents_ReconnectRecoversChildCompletionAfterParentFinished(t 
 	disconnect := make(chan struct{})
 	socket := managedFixture(t, func(ws *websocket.Conn) {
 		first := connections.Add(1) == 1
-		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+		fixtureRPCWithEmptyHistory(t, ws, func(m daemonMessage) (any, bool) {
 			if m.Method != "thread/resume" {
 				return nil, false
 			}

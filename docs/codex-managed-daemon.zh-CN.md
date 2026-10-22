@@ -226,3 +226,14 @@ managed daemon 后端将父 thread 的 `collabAgentToolCall` 同步为主回答�
 任务描述取首个非空行、最多 16 字符，超长显示省略号。没有名称时只显示 ID，没有描述时省略任务段。
 状态图标为 ⏳ 等待、🔄 运行、⏸️ 暂停、✅ 完成、❌ 失败、🚫 取消；未知状态用 ❔。
 完整 ID、任务描述及状态文字保留在展开详情中。
+
+### 会话来源与历史分页
+
+`source` 是服务端记录的会话来源，不等同于当前连接方式或客户端名称。
+`originator` 记录创建时的客户端标识；`threadSource` 是另一项分析分类。
+通过 managed daemon / app-server 创建或接入的会话也可能标记为 `vscode` 或 `cli`，
+不能仅凭传输方式推断为 `appServer`。当前 `/list` 沿用服务端默认的交互来源范围，
+再检查工作目录并排除子 agent。
+
+接入和重连使用 `thread/resume` 的 `excludeTurns`，随后按轮次分页恢复历史、活动轮次及子 agent 状态，
+避免整个历史集中在一个 WebSocket 响应中。单个轮次响应仍受 32 MiB 消息上限约束。

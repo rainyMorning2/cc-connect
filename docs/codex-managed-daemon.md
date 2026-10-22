@@ -229,3 +229,17 @@ are capped at 12 characters each, and the first nonempty task line at 16, includ
 an ellipsis when truncated. Missing names fall back to the ID without duplication.
 Statuses use ⏳ queued, 🔄 running, ⏸️ suspended, ✅ completed, ❌ failed, 🚫 cancelled,
 and ❔ for unknown states. Full IDs, task descriptions, and status text remain in details.
+
+### Session source and snapshot pagination
+
+`source` is the server-recorded session origin, not the current transport or
+client name. `originator` identifies the creating client; `threadSource` is a
+separate analytics classification. A managed daemon/app-server session may have
+`source = vscode` or `cli`; the transport alone does not imply `appServer`.
+`/list` retains the server's default interactive-source filter, then checks the
+workspace and excludes subagents.
+
+Attach and reconnect request `thread/resume` with `excludeTurns`, then paginate
+turns to restore history, active work, and subagent state. This avoids placing
+all history in one WebSocket response. A single turn response remains subject
+to the 32 MiB message limit.

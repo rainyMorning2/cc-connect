@@ -570,6 +570,8 @@ func TestManagedHistory_TotalHistoryExceedsWebSocketLimit(t *testing.T) {
 	text := strings.Repeat("x", 17*1024*1024)
 	var pages atomic.Int32
 	socket := managedFixture(t, func(ws *websocket.Conn) {
+		// Decoding tens of MiB under -race can exceed the small fixture default.
+		_ = ws.SetReadDeadline(time.Now().Add(60 * time.Second))
 		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
 			if m.Method == "thread/read" {
 				return map[string]any{"thread": map[string]any{"id": "target", "cwd": cwd}}, true

@@ -26,10 +26,13 @@ func TestManagedReconnect_ZeroAttemptsClosesObserverWithoutRetry(t *testing.T) {
 	socket := managedFixture(t, func(ws *websocket.Conn) {
 		connections.Add(1)
 		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
-			if m.Method != "thread/resume" {
+			if m.Method == "thread/resume" {
+				return fixtureSnapshot(cwd, "target", ""), true
+			}
+			if m.Method != "thread/turns/list" {
 				t.Errorf("unexpected RPC %s", m.Method)
 			}
-			if err := ws.WriteJSON(map[string]any{"id": m.ID, "result": fixtureSnapshot(cwd, "target", "")}); err != nil {
+			if err := ws.WriteJSON(map[string]any{"id": m.ID, "result": map[string]any{"data": []any{}}}); err != nil {
 				t.Error(err)
 			}
 			// Exercise a disconnect after attach, not a failed initial handshake.
@@ -139,7 +142,7 @@ func TestManagedRuntimeSettingsQueryDoesNotOverrideSettingsOrActiveTurn(t *testi
 			reads++
 			n := reads
 			mu.Unlock()
-			if params["threadId"] != "target" || (n == 1 && len(params) != 1) || (n > 1 && (len(params) != 2 || params["excludeTurns"] != true)) {
+			if params["threadId"] != "target" || len(params) != 2 || params["excludeTurns"] != true {
 				t.Errorf("settings query overrides runtime: %s", m.Params)
 			}
 			snapshot := fixtureSnapshot(cwd, "target", "active")
@@ -458,7 +461,7 @@ func TestManagedAttachDoesNotOverrideExistingSettingsOrRespondOnClose(t *testing
 			if m.Method == "thread/resume" {
 				var params map[string]any
 				_ = json.Unmarshal(m.Params, &params)
-				if len(params) != 1 || params["threadId"] != "target" {
+				if len(params) != 2 || params["excludeTurns"] != true || params["threadId"] != "target" {
 					t.Errorf("attach overrides existing thread: %s", m.Params)
 				}
 				// Interleave a server request with the exact same ID as this client RPC.
@@ -494,4 +497,14 @@ func TestManagedAttachDoesNotOverrideExistingSettingsOrRespondOnClose(t *testing
 		t.Fatalf("close answered approval: %+v", m)
 	default:
 	}
+}
+
+// Settings/event fixtures have no stored history unless a test supplies it.
+func fixtureRPCWithEmptyHistory(t *testing.T, ws *websocket.Conn, fn func(daemonMessage) (any, bool)) {
+	fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+		if m.Method == "thread/turns/list" {
+			return map[string]any{"data": []any{}}, true
+		}
+		return fn(m)
+	})
 }

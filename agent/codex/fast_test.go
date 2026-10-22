@@ -19,7 +19,7 @@ func TestManagedFast_UpdatesOnlyAttachedThreadAndTracksExternalChanges(t *testin
 	tier := "priority"
 	var updates []map[string]any
 	socket := managedFixture(t, func(ws *websocket.Conn) {
-		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+		fixtureRPCWithEmptyHistory(t, ws, func(m daemonMessage) (any, bool) {
 			mu.Lock()
 			defer mu.Unlock()
 			switch m.Method {
@@ -93,7 +93,7 @@ func TestManagedFast_UpdatesOnlyAttachedThreadAndTracksExternalChanges(t *testin
 func TestManagedFast_ReportsRejectionAndBusy(t *testing.T) {
 	cwd := t.TempDir()
 	socket := managedFixture(t, func(ws *websocket.Conn) {
-		fixtureRPC(t, ws, func(m daemonMessage) (any, bool) {
+		fixtureRPCWithEmptyHistory(t, ws, func(m daemonMessage) (any, bool) {
 			if m.Method == "thread/resume" {
 				return fixtureSnapshot(cwd, "target", ""), true
 			}

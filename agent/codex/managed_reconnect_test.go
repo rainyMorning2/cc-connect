@@ -117,14 +117,14 @@ func TestManagedReconnectRecoversWithoutActiveTurn(t *testing.T) {
 							return fixtureSnapshot(cwd, "target", ""), true
 						}
 						return snapshot, true
-					case "thread/read":
+					case "thread/turns/list":
 						reads.Add(1)
 						var params map[string]any
 						_ = json.Unmarshal(m.Params, &params)
-						if params["includeTurns"] != true || params["threadId"] != "target" {
+						if params["itemsView"] != "full" || params["limit"] != float64(1) || params["threadId"] != "target" {
 							t.Errorf("wrong history query: %s", m.Params)
 						}
-						return map[string]any{"thread": snapshot["thread"]}, true
+						return map[string]any{"data": snapshot["thread"].(map[string]any)["turns"]}, true
 					default:
 						t.Errorf("unexpected RPC %s", m.Method)
 						return nil, false
@@ -189,8 +189,8 @@ func TestManagedReconnectDoesNotGuessUnfinishedTurnState(t *testing.T) {
 						return nil, false
 					}
 					return fixtureSnapshot(cwd, "target", ""), true
-				case "thread/read":
-					return map[string]any{"thread": fixtureSnapshot(cwd, "target", "")["thread"]}, true
+				case "thread/turns/list":
+					return map[string]any{"data": []any{}}, true
 				default:
 					t.Errorf("unexpected RPC %s", m.Method)
 					return nil, false
