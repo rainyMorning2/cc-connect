@@ -68,7 +68,7 @@ func (s *webSession) addQuestion(q webQuestion) {
 	}
 	questions := make([]core.UserQuestion, 0, len(q.Questions))
 	for _, item := range q.Questions {
-		cq := core.UserQuestion{ID: item.ID, Question: item.Question, Header: item.Header, MultiSelect: item.Multi}
+		cq := core.UserQuestion{ID: item.ID, Question: item.Question, Header: item.Header, MultiSelect: item.Multi, IsOther: item.AllowOther}
 		for _, o := range item.Options {
 			cq.Options = append(cq.Options, core.UserQuestionOption{Label: o.Label, Description: o.Description})
 		}

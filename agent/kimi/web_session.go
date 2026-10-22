@@ -278,10 +278,12 @@ func (s *webSession) run(conn *websocket.Conn, replay []webFrame) {
 			if err != nil {
 				continue
 			}
-			conn, replay, err = s.connect(snap.Seq, snap.Epoch)
+			nextConn, nextReplay, connectErr := s.connect(snap.Seq, snap.Epoch)
+			err = connectErr
 			if err != nil {
 				continue
 			}
+			conn, replay = nextConn, nextReplay
 			if err = s.reconcileSnapshot(snap); err != nil {
 				conn.Close()
 				continue
