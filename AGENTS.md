@@ -162,25 +162,25 @@ All user-facing strings must go through `core/i18n.go`:
 ### 本机 Go 缓存与临时目录（WSL）
 
 运行构建、测试或审计前，先用 `go env GOMODCACHE GOCACHE GOTMPDIR`
-确认有效路径，并优先复用已有配置：
+确认有效路径。**默认直接使用 `go env` 的现有配置，不自行通过命令行环境变量覆盖，
+也不为当前任务另建缓存或构建临时目录。** 本机通常配置为：
 
 - `GOMODCACHE="$HOME/.cache/go-mod"`：依赖模块缓存。
 - `GOCACHE="$HOME/.cache/go-build"`：编译缓存；`GOMODCACHE` 不控制编译缓存的位置。
 - `GOTMPDIR="$HOME/.cache/go-tmp"`：Go 构建临时目录；它不控制测试代码或其他工具自行创建的临时文件。
 
-路径以当前用户的 `$HOME` 为准，不使用其他电脑的绝对路径，也不假定已配置
-`~/.bashrc` 或 Go 持久配置。需要时仅对本次命令设置，例如：
+以上路径仅说明本机约定，实际以 `go env` 输出为准，不使用其他电脑的绝对路径，
+也不假定 shell 启动文件已加载。若 `go env` 因自动下载工具链而触发权限错误，
+可用 `GOTOOLCHAIN=local go env GOMODCACHE GOCACHE GOTMPDIR` 仅读取配置。
 
-```bash
-GOMODCACHE="$HOME/.cache/go-mod" GOCACHE="$HOME/.cache/go-build" \
-  GOTMPDIR="$HOME/.cache/go-tmp" make build
-```
+**遇到沙箱只读或写入权限不足时，应申请权限后继续使用原有目录，
+不得自行切换到工作区 `.cache`、`/tmp` 或其他临时目录。**
+若权限申请未获批准，说明阻塞原因并等待用户决定，不擅自改换路径。
+只有用户明确要求或同意时才调整缓存、临时目录或相关环境变量。
 
 不要把 Go 编译缓存、依赖缓存或大型构建临时目录放在 `/tmp`，也不要为每次任务
 创建独立的 `/tmp/*-gocache`。部分机器的 `/tmp` 是 tmpfs，会占用内存或 swap。
-使用前创建目录并用 `findmnt -T <目录>` 确认其不在 tmpfs 上。
-若沙箱无法写入现有缓存，使用工作区内普通磁盘上的可写目录，例如
-`$PWD/.cache/go-build`，构建临时目录同样使用普通磁盘。
+使用前用 `findmnt -T <目录>` 确认其不在 tmpfs 上；需要创建目录时遵守写入权限要求。
 不擅自修改用户的全局环境或 `go env -w` 配置，也不要为常规验证清空共享缓存。
 
 ### Running Tests

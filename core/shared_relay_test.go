@@ -63,3 +63,52 @@ func TestSharedRelayTimeoutReturnsWithoutEventsAndPreservesPendingReader(t *test
 	env.send(env.button(env.e.i18n.T(MsgSharedCancelDecision)))
 	call.finish("LATE RESULT")
 }
+
+func TestSharedRelayTimeoutExcludesToolOutput(t *testing.T) {
+	for _, partial := range []string{"", "Assistant progress"} {
+		t.Run(partial, func(t *testing.T) {
+			e := NewEngine("test", &stubAgent{}, nil, "", LangEnglish)
+			t.Cleanup(func() {
+				if err := e.Stop(); err != nil {
+					t.Error(err)
+				}
+			})
+			session := e.sessions.GetOrCreateActive("relay")
+			f := &sharedForeground{events: make(chan Event)}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			cleaned := make(chan struct{})
+			type result struct {
+				text string
+				err  error
+			}
+			done := make(chan result, 1)
+			go func() {
+				text, err := e.collectSharedRelay(ctx, nil, session, e.sessions, f, nil, func() { close(cleaned) })
+				done <- result{text, err}
+			}()
+			f.events <- Event{Type: EventToolResult, ToolName: "Bash", ToolResult: "INTERNAL TOOL OUTPUT"}
+			if partial != "" {
+				f.events <- Event{Type: EventText, Content: partial}
+			}
+			cancel()
+			got := <-done
+			if strings.Contains(got.text, "INTERNAL TOOL OUTPUT") {
+				t.Errorf("tool output leaked: %q", got.text)
+			}
+			if partial == "" {
+				if got.text != "" || got.err != context.Canceled {
+					t.Errorf("got %q, %v; want cancellation", got.text, got.err)
+				}
+			} else if got.err != nil || got.text != fmt.Sprintf(e.i18n.T(MsgRelayPartial), partial) {
+				t.Errorf("got %q, %v; want localized partial notice", got.text, got.err)
+			}
+			f.events <- Event{Type: EventResult}
+			select {
+			case <-cleaned:
+			case <-time.After(time.Second):
+				t.Fatal("background relay did not finish")
+			}
+		})
+	}
+}
