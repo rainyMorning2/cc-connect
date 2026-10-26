@@ -164,27 +164,24 @@ All user-facing strings must go through `core/i18n.go`:
 运行构建、测试或审计前，先用 `go env GOMODCACHE GOCACHE GOTMPDIR`
 确认有效路径，并优先复用已有配置：
 
-- `GOMODCACHE=/home/daizhen/.cache/go-mod`：依赖模块缓存，已配置在
-  `~/.bashrc` 和 Go 持久配置中。
-- `GOCACHE=/home/daizhen/.cache/go-build`：当前默认编译缓存；
-  `GOMODCACHE` 不控制编译缓存的位置。
-- `GOTMPDIR=/home/daizhen/workspace/.cache/go-tmp`：Go 构建临时目录，
-  已配置在 `~/.bashrc` 和 Go 持久配置中；目录位于 ext4 磁盘上，避免
-  Go 默认把构建临时文件放进 `/tmp`。它不控制测试代码或其他工具自行
-  创建的临时文件，不能据此认为 `/tmp` 完全不会再被使用。
+- `GOMODCACHE="$HOME/.cache/go-mod"`：依赖模块缓存。
+- `GOCACHE="$HOME/.cache/go-build"`：编译缓存；`GOMODCACHE` 不控制编译缓存的位置。
+- `GOTMPDIR="$HOME/.cache/go-tmp"`：Go 构建临时目录；它不控制测试代码或其他工具自行创建的临时文件。
 
-**本机 `/tmp` 是 tmpfs，文件会占用内存或 swap。不要把 Go 编译缓存、
-依赖缓存或大型构建临时目录放在 `/tmp`，也不要为每次任务创建独立的
-`/tmp/*-gocache`。** 2026-10-19 排查卡顿时发现
-`/tmp/cc-connect-audit-gocache` 占用约 3 GiB，同期 WSL 出现内存压力和
-3 GiB swap 耗尽；这是资源叠加的线索，不能据此认定单一任务是根因。
+路径以当前用户的 `$HOME` 为准，不使用其他电脑的绝对路径，也不假定已配置
+`~/.bashrc` 或 Go 持久配置。需要时仅对本次命令设置，例如：
 
-若沙箱无法写入现有缓存，使用工作区内普通磁盘上的可写目录，例如
-`/home/daizhen/workspace/.cache/go-build`；构建临时文件复用上述
-`GOTMPDIR` 目录，不另建 `/tmp/go-build*` 目录或覆盖回 `/tmp`。
+```bash
+GOMODCACHE="$HOME/.cache/go-mod" GOCACHE="$HOME/.cache/go-build" \
+  GOTMPDIR="$HOME/.cache/go-tmp" make build
+```
+
+不要把 Go 编译缓存、依赖缓存或大型构建临时目录放在 `/tmp`，也不要为每次任务
+创建独立的 `/tmp/*-gocache`。部分机器的 `/tmp` 是 tmpfs，会占用内存或 swap。
 使用前创建目录并用 `findmnt -T <目录>` 确认其不在 tmpfs 上。
-需要覆盖变量时仅对本次命令设置，不擅自修改用户的全局环境或 `go env -w`
-配置，也不要为常规验证清空共享缓存。
+若沙箱无法写入现有缓存，使用工作区内普通磁盘上的可写目录，例如
+`$PWD/.cache/go-build`，构建临时目录同样使用普通磁盘。
+不擅自修改用户的全局环境或 `go env -w` 配置，也不要为常规验证清空共享缓存。
 
 ### Running Tests
 
@@ -275,7 +272,7 @@ Available tags: `no_acp`, `no_claudecode`, `no_codex`, `no_copilot`, `no_cursor`
 
 ## 本地打包与运行入口（local 分支）
 
-本机本地实验的打包产物统一放在 `/home/daizhen/.local/share/cc-connect/builds`，
+本机本地实验的打包产物统一放在 `~/.local/share/cc-connect/builds`，
 按版本和提交保存独立二进制。命名格式为：
 
 ```text
@@ -303,7 +300,7 @@ cc-connect-<基础版本>-local-<8 位 commit ID>
 local_base_version='v1.5.1-beta.5'
 local_build_commit=$(git rev-parse --short=8 HEAD)
 local_build_version="${local_base_version}-local-${local_build_commit}"
-local_build_dir='/home/daizhen/.local/share/cc-connect/builds'
+local_build_dir="$HOME/.local/share/cc-connect/builds"
 local_build_binary="${local_build_dir}/cc-connect-${local_build_version}"
 
 mkdir -p "$local_build_dir"
@@ -317,7 +314,7 @@ test ! -e "$local_build_binary" && make build \
 
 ### cc-connect-local 软链接
 
-`/home/daizhen/.local/bin/cc-connect-local` 是本地运行入口，指向上述 builds
+`~/.local/bin/cc-connect-local` 是本地运行入口，指向上述 builds
 目录中某一个明确选择的二进制。调用 `cc-connect-local` 会执行它当前指向的版本；
 新产物放入 builds 目录不会自动启用。
 
@@ -330,9 +327,9 @@ test ! -e "$local_build_binary" && make build \
 仅在用户明确授权后执行的切换示例：
 
 ```bash
-ln -sfn -- "$local_build_binary" /home/daizhen/.local/bin/cc-connect-local
-readlink -f /home/daizhen/.local/bin/cc-connect-local
-/home/daizhen/.local/bin/cc-connect-local --version
+ln -sfn -- "$local_build_binary" ~/.local/bin/cc-connect-local
+readlink -f ~/.local/bin/cc-connect-local
+~/.local/bin/cc-connect-local --version
 ```
 
 其中 `local_build_binary` 必须是本次明确选择且已验证的产物路径；后续会话或新终端中
