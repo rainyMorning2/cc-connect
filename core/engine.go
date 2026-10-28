@@ -570,6 +570,7 @@ type interactiveState struct {
 	workspaceDir             string
 	agent                    Agent
 	mu                       sync.Mutex
+	lastSteeredTurn          string // protected by mu; scopes final-reply relocation to the steered turn
 	stopCh                   chan struct{}
 	stopped                  bool
 	shared                   sharedSessionState       // persistent observer state, protected by mu
@@ -6753,7 +6754,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 				finalBody := resolveRichCardMarkdown(parts[0], true)
 				toolSteps = e.sharedSubagentSteps(state, event.TurnID, toolSteps)
 				finalCard := richCardSupporter.BuildRichCard(CardStatusDone, "", toolSteps, finalBody, false, richStatusFooter)
-				sentLatest := approvalAfterRichCard && !hasSubagentSteps(toolSteps) && strings.TrimSpace(finalBody) != "" && e.sendLatestRichFinal(p, replyCtx, cardMessageID, finalCard, richCardSupporter)
+				sentLatest := (approvalAfterRichCard || state.richFinalWasSteered(event.TurnID)) && !hasSubagentSteps(toolSteps) && strings.TrimSpace(finalBody) != "" && e.sendLatestRichFinal(p, replyCtx, cardMessageID, finalCard, richCardSupporter)
 				if !sentLatest && cardMessageID != nil {
 					// Forced final flush via cardkit-v1 streaming text update before
 					// flipping status to Done via full-card Patch. The throttle in the

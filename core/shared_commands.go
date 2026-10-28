@@ -78,7 +78,7 @@ func (e *Engine) handleSharedCommand(p Platform, msg *Message, command string, a
 			e.reply(p, msg.ReplyCtx, e.i18n.T(MsgSharedSteerUsage))
 			return true
 		}
-		e.replySharedSteer(p, msg, as, text)
+		e.replySharedSteer(p, msg, state, as, text)
 
 	case "decision", "answer", "skip":
 		e.sharedRequestCommand(p, msg, state, as, command, args)
@@ -290,12 +290,14 @@ func (e *Engine) stopSharedTurn(state *interactiveState, as SharedAgentSession, 
 	return canceller.CancelTurn()
 }
 
-func (e *Engine) replySharedSteer(p Platform, msg *Message, as SharedAgentSession, text string) {
-	key, err := steerSharedSession(as, as.RuntimeState().TurnID, text)
+func (e *Engine) replySharedSteer(p Platform, msg *Message, state *interactiveState, as SharedAgentSession, text string) {
+	turnID := as.RuntimeState().TurnID
+	key, err := steerSharedSession(as, turnID, text)
 	if err != nil {
 		e.reply(p, msg.ReplyCtx, e.i18n.Tf(MsgError, err))
 		return
 	}
+	state.noteRichFinalSteer(turnID, key)
 	e.reply(p, msg.ReplyCtx, e.i18n.T(key))
 }
 

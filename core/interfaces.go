@@ -739,7 +739,8 @@ type StreamingCardPlatform interface {
 }
 
 // ApprovalFinalReplyPlatform requests a fresh final answer when approval
-// messages were emitted after the current rich reply preview began.
+// messages were emitted after the current rich reply preview began, or the turn
+// accepted steering input. The method name is retained for compatibility.
 type ApprovalFinalReplyPlatform interface {
 	FinalReplyAfterApproval() bool
 }

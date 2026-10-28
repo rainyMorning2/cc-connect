@@ -25,3 +25,32 @@ func (e *Engine) sendLatestRichFinal(p Platform, replyCtx, previewHandle any, fi
 	}
 	return true
 }
+
+// Only a confirmed insertion belongs to the active turn. Queued or uncertain
+// submissions must not relocate an unrelated answer.
+func (state *interactiveState) noteRichFinalSteer(turnID string, result MsgKey) {
+	if turnID == "" || result != MsgSharedSteerAccepted {
+		return
+	}
+	state.mu.Lock()
+	state.lastSteeredTurn = turnID
+	state.mu.Unlock()
+}
+
+func (state *interactiveState) richFinalWasSteered(turnID string) bool {
+	state.mu.Lock()
+	owner := state
+	if state.sharedPresentation != nil {
+		owner = state.sharedPresentation.runtime
+		if turnID == "" {
+			turnID = state.sharedPresentation.turnID
+		}
+	}
+	state.mu.Unlock()
+	if owner == nil || turnID == "" {
+		return false
+	}
+	owner.mu.Lock()
+	defer owner.mu.Unlock()
+	return owner.lastSteeredTurn == turnID
+}

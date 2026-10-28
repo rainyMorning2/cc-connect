@@ -117,3 +117,28 @@ func TestResolvedPermissionCard_CollapsesEveryDecisionAndPreservesDetails(t *tes
 		t.Fatal("pending details must remain open")
 	}
 }
+
+type steerFinalTestPlatform struct {
+	observedToolOutputPlatform
+	enabled bool
+}
+
+func (p *steerFinalTestPlatform) FinalReplyAfterApproval() bool { return p.enabled }
+func (p *steerFinalTestPlatform) SendRichCard(ctx context.Context, reply any, content string) error {
+	return p.Send(ctx, reply, "LATEST: "+content)
+}
+
+func TestRichFinal_SteerIsScopedToConfirmedTurn(t *testing.T) {
+	owner := &interactiveState{}
+	view := &interactiveState{sharedPresentation: &sharedPresentationState{runtime: owner, turnID: "first"}}
+	for _, outcome := range []MsgKey{MsgSharedSteerQueued, MsgSharedSteerRunning, MsgSharedSteerProcessed, MsgSharedSteerUnconfirmed, MsgSharedUnsupported} {
+		owner.noteRichFinalSteer("first", outcome)
+		if view.richFinalWasSteered("") {
+			t.Fatalf("unexpected relocation for %s", outcome)
+		}
+	}
+	owner.noteRichFinalSteer("first", MsgSharedSteerAccepted)
+	if !view.richFinalWasSteered("") || view.richFinalWasSteered("second") {
+		t.Fatal("steering must relocate only its own turn")
+	}
+}

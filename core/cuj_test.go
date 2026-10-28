@@ -4209,3 +4209,68 @@ func TestCUJ_C7_SharedAutomaticBestEffortSteerKeepsMediaQueued(t *testing.T) {
 		})
 	}
 }
+
+func TestCUJ_C7_SteerMovesFinalAnswerToLatest(t *testing.T) {
+	for _, tc := range []struct {
+		name, input string
+		enabled     bool
+	}{
+		{"explicit", "/steer adjust the answer", true},
+		{"automatic", "adjust the answer", true},
+		{"in_place", "/steer adjust the answer", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &steerFinalTestPlatform{enabled: tc.enabled}
+			p.n = "test"
+			a := &sharedTestAgent{}
+			e := NewEngine("steer-final", &autoSteerTestAgent{a, true}, []Platform{p}, t.TempDir()+"/sessions.json", LangEnglish)
+			defer e.Stop()
+			e.display.CardMode, e.display.ToolMessages = "rich", true
+			send := func(text string) {
+				e.ReceiveMessage(p, &Message{SessionKey: "test:user", Platform: "test", UserID: "user", Content: text, ReplyCtx: "reply"})
+			}
+			await := func(text string) {
+				t.Helper()
+				deadline := time.Now().Add(3 * time.Second)
+				for time.Now().Before(deadline) {
+					if strings.Contains(strings.Join(p.getSent(), "\n"), text) {
+						return
+					}
+					time.Sleep(5 * time.Millisecond)
+				}
+				t.Fatalf("missing %q: %v", text, p.getSent())
+			}
+			send("/attach first")
+			await("Attached to session first")
+			as := a.connection("first")
+			turn := as.RuntimeState().TurnID
+			as.emit(Event{Type: EventToolUse, TurnID: turn, ToolName: "Bash", ToolInput: "PREVIEW before steering"})
+			await("PREVIEW before steering")
+			send(tc.input)
+			await(e.i18n.T(MsgSharedSteerAccepted))
+			as.emit(Event{Type: EventResult, TurnID: turn, Content: "STEER FINAL ANSWER", Done: true})
+			await("STEER FINAL ANSWER")
+			if tc.enabled {
+				await(e.i18n.T(MsgFinalReplyLatest))
+			}
+			visible := strings.Join(p.getSent(), "\n")
+			if strings.Contains(visible, "LATEST:") != tc.enabled {
+				t.Fatalf("unexpected final answer position: %s", visible)
+			}
+			as.mu.Lock()
+			as.turn = "next"
+			as.mu.Unlock()
+			as.emit(Event{Type: EventToolUse, TurnID: "next", ToolName: "Bash", ToolInput: "NEXT PREVIEW"})
+			await("NEXT PREVIEW")
+			as.emit(Event{Type: EventResult, TurnID: "next", Content: "NEXT FINAL ANSWER", Done: true})
+			await("NEXT FINAL ANSWER")
+			for _, msg := range p.getSent() {
+				if strings.HasPrefix(msg, "LATEST:") && strings.Contains(msg, "NEXT FINAL ANSWER") {
+					t.Fatal("steering relocation leaked into the next turn")
+				}
+			}
+			send("/detach")
+			await(e.i18n.T(MsgSharedDetached))
+		})
+	}
+}

@@ -80,6 +80,7 @@ func (e *Engine) handleSharedBusyMessage(p Platform, msg *Message, agent Agent, 
 		e.reply(p, msg.ReplyCtx, e.i18n.T(keyMessage))
 		return true
 	}
+	state.noteRichFinalSteer(runtime.TurnID, keyMessage)
 	session.TouchUserActivity()
 	e.noteUserMessageAccepted(key, msg.UserMessageTimeMs)
 	runMessageAccepted(msg)
