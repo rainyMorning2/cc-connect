@@ -546,11 +546,12 @@ func (env *cujEnv) activeSession(sessionKey string) *Session {
 	return env.engine.sessions.GetOrCreateActive(sessionKey)
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // CUJ-B3 · /switch back to old session keeps history (baseline — locks down
 // the BUG-2026-06-14 regression at the FULL engine level, not just
 // SessionManager. Complements TestSwitchToAgentSession_PreservesHistory.)
-// ===========================================================================
+// ====================================================================}
 
 func TestCUJ_B3_SwitchPreservesHistoryEndToEnd(t *testing.T) {
 	env := newCUJEnv(t)
@@ -613,14 +614,15 @@ func TestCUJ_B3_SwitchPreservesHistoryEndToEnd(t *testing.T) {
 	}
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // CUJ-C4 · /cancel stops current turn AND creates a fresh session
 //
 // SPOTLIGHT: This was a 🔴 RED hole in CUJ-INVENTORY (cmdCancel had 0
 // dedicated tests). The /cancel UX is non-obvious — it intentionally combines
 // /stop + clear history + /new. This test locks down ALL three behaviors so
 // any future "simplification" that breaks one of them is caught immediately.
-// ===========================================================================
+// ====================================================================}
 
 func TestCUJ_C4_CancelStopsAndStartsFreshSession(t *testing.T) {
 	env := newCUJEnv(t)
@@ -681,9 +683,10 @@ func TestCUJ_C4_CancelStopsAndStartsFreshSession(t *testing.T) {
 	}
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // CUJ-B6 · /name renames current session and /list shows the new name
-// ===========================================================================
+// ====================================================================}
 
 func TestCUJ_B6_NameRenamesCurrentSession(t *testing.T) {
 	env := newCUJEnv(t)
@@ -731,9 +734,10 @@ func TestCUJ_B6_NameRenamesCurrentSession(t *testing.T) {
 	}
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // CUJ-B9 · /search finds keyword in history across past turns
-// ===========================================================================
+// ====================================================================}
 
 func TestCUJ_B9_SearchFindsKeywordInHistory(t *testing.T) {
 	env := newCUJEnv(t)
@@ -780,7 +784,8 @@ func TestCUJ_B9_SearchFindsKeywordInHistory(t *testing.T) {
 	}
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // CUJ-D7 · outgoing_rate_limit throttles bursts so cc-connect does not get
 // the bot banned by IM platforms for spamming. Throttle is end-to-end:
 // SendToSession → waitOutgoing → p.Send.
@@ -788,7 +793,7 @@ func TestCUJ_B9_SearchFindsKeywordInHistory(t *testing.T) {
 // SPOTLIGHT: This was a 🔴 RED hole at the ENGINE level. Unit tests in
 // outgoing_ratelimit_test.go cover the limiter in isolation, but no test
 // verified the limiter is actually wired into SendToSession.
-// ===========================================================================
+// ====================================================================}
 
 func TestCUJ_D7_OutgoingRateLimitThrottlesBurst(t *testing.T) {
 	env := newCUJEnv(t)
@@ -833,7 +838,8 @@ func TestCUJ_D7_OutgoingRateLimitThrottlesBurst(t *testing.T) {
 	}
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // CUJ-G1 · When the agent (LLM) fails to start, user sees a clear error
 // message — not silence.
 //
@@ -842,7 +848,7 @@ func TestCUJ_D7_OutgoingRateLimitThrottlesBurst(t *testing.T) {
 // the StartSession error at engine.go:3274 and surfaces
 // MsgFailedToStartAgentSession; this test locks that contract down so a
 // future refactor that "silently swallows" the error gets caught.
-// ===========================================================================
+// ====================================================================}
 
 type failingAgent struct {
 	cujAgent
@@ -896,7 +902,8 @@ func TestCUJ_G1_LLMFailureSurfacesErrorToUser(t *testing.T) {
 	}
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // CUJ-E2 · A cron job created (programmatically by the agent or directly
 // via the store) shows up in /cron output for the same SessionKey.
 //
@@ -904,7 +911,7 @@ func TestCUJ_G1_LLMFailureSurfacesErrorToUser(t *testing.T) {
 // `/cron` returned empty (the agent's cron used the project name but the
 // list was filtered by SessionKey). This test locks down that listing
 // returns the job for the user that owns the relevant session.
-// ===========================================================================
+// ====================================================================}
 
 func TestCUJ_E2_AgentCreatedCronShowsInList(t *testing.T) {
 	env := newCUJEnv(t)
@@ -953,13 +960,14 @@ func TestCUJ_E2_AgentCreatedCronShowsInList(t *testing.T) {
 	})
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // CUJ-E5 · A one-shot timer disappears from /timer list AFTER it fires
 // (distinguishing it from recurring /cron entries that persist).
 //
 // Pre-condition: timer's MaxRuns=1 semantics — verifies the "disappear after
 // firing" UX commitment we made in the cron-vs-timer UX changes.
-// ===========================================================================
+// ====================================================================}
 
 func TestCUJ_E5_TimerDisappearsAfterFiring(t *testing.T) {
 	env := newCUJEnv(t)
@@ -1025,7 +1033,8 @@ func TestCUJ_E5_TimerDisappearsAfterFiring(t *testing.T) {
 	}
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // CUJ-B12 · After cc-connect restarts, the user's session, history, agent
 // session ID, and cron jobs all survive — the user can continue as if
 // nothing happened.
@@ -1033,7 +1042,7 @@ func TestCUJ_E5_TimerDisappearsAfterFiring(t *testing.T) {
 // SPOTLIGHT: This synthesizes the entire BUG-2026-06-14 lesson: persistence
 // must be END-TO-END across a restart, not just per-component. Bug B
 // (history not saved on user msg) only manifested across a restart.
-// ===========================================================================
+// ====================================================================}
 
 func TestCUJ_B12_RestartRestoresEverything(t *testing.T) {
 	dir := t.TempDir()
@@ -1151,7 +1160,8 @@ func mkAll(dir string) error {
 	return os.MkdirAll(dir, 0o755)
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // CUJ-C3 · In default permission mode, when the user clicks "deny" on a
 // tool-use card, the agent receives a deny response and the tool is NOT
 // executed.
@@ -1159,7 +1169,7 @@ func mkAll(dir string) error {
 // SPOTLIGHT: This locks down the most critical safety property of default
 // mode: USER DENY MUST REACH THE AGENT. A regression that silently swallowed
 // the deny would let agents execute tools without consent.
-// ===========================================================================
+// ====================================================================}
 
 func TestCUJ_C3_DefaultModeDenyStopsToolExecution(t *testing.T) {
 	env := newCUJEnv(t)
@@ -1233,7 +1243,8 @@ func TestCUJ_C3_DefaultModeDenyStopsToolExecution(t *testing.T) {
 	}
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // CUJ-G3 · After a platform reports its WS connection went down and then
 // came back, the engine re-initializes platform capabilities (command
 // menu re-registration) AND user messages continue to be processed.
@@ -1242,7 +1253,7 @@ func TestCUJ_C3_DefaultModeDenyStopsToolExecution(t *testing.T) {
 // fragile. This CUJ locks down the engine-side contract: every
 // ready→unavailable→ready cycle MUST re-run initPlatformCapabilities so
 // stale state (e.g. commands registered against an old WS) gets refreshed.
-// ===========================================================================
+// ====================================================================}
 
 func TestCUJ_G3_PlatformReconnectReinitializesAndDelivers(t *testing.T) {
 	dir := t.TempDir()
@@ -1308,9 +1319,10 @@ func TestCUJ_G3_PlatformReconnectReinitializesAndDelivers(t *testing.T) {
 // only uses it for logging.
 var errSimDisconnect = &startSessionError{msg: "simulated ws disconnect"}
 
-// ===========================================================================
+// ====================================================================}
+
 // SPRINT 2 · A organization (basic conversation)
-// ===========================================================================
+// ====================================================================}
 
 // CUJ-A1 · User sends first message → receives agent reply
 func TestCUJ_A1_FirstMessageGetsReply(t *testing.T) {
@@ -1480,9 +1492,10 @@ func TestCUJ_A6_A7_CoveredByPlatformLayer(t *testing.T) {
 	t.Log("CUJ-A7 (private chat does not require @): same coverage as A6")
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // SPRINT 2 · B organization (session lifecycle remaining)
-// ===========================================================================
+// ====================================================================}
 
 // CUJ-B1 · /new creates a fresh session independent from the previous one.
 func TestCUJ_B1_NewCreatesIndependentSession(t *testing.T) {
@@ -1688,9 +1701,10 @@ func TestCUJ_B11_PrivateVsGroupSessionsIsolated(t *testing.T) {
 	}
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // SPRINT 2 · C organization (agent control remaining)
-// ===========================================================================
+// ====================================================================}
 
 // CUJ-C1 · yolo mode: tool use does NOT pop permission card.
 // Mode-switching is a per-agent contract; here we assert the engine respects
@@ -1738,9 +1752,10 @@ func TestCUJ_C6_ModeSwitchAcknowledged(t *testing.T) {
 	}
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // SPRINT 2 · D organization (security & permissions)
-// ===========================================================================
+// ====================================================================}
 
 // CUJ-D1 · allow_from: stranger gets no engine routing.
 // allow_from is enforced at the PLATFORM boundary (per-platform config), not
@@ -1818,9 +1833,10 @@ func TestCUJ_D6_InboundRateLimitDrops(t *testing.T) {
 	}
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // SPRINT 2 · E organization (scheduled tasks remaining)
-// ===========================================================================
+// ====================================================================}
 
 // CUJ-E1 · /cron sets a recurring task and it fires at the scheduled time.
 // True scheduling assertion requires either ≥1-minute wait or a clock mock;
@@ -2007,9 +2023,10 @@ func TestCUJ_E6_TimerSurvivesRestart(t *testing.T) {
 	}
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // SPRINT 2 · F organization (config switching)
-// ===========================================================================
+// ====================================================================}
 
 // CUJ-F1 · /provider switches LLM provider for the next message — provider
 // management lives outside core/engine.go (per-agent). Linked.
@@ -2064,9 +2081,10 @@ func TestCUJ_F4_HotReloadBannedWordsTakesEffect(t *testing.T) {
 	}
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // SPRINT 2 · G organization (error handling remaining)
-// ===========================================================================
+// ====================================================================}
 
 // CUJ-G2 · LLM timeout: when agent never returns an event, user should see
 // some indicator. Real timeout handling is configured per-agent; engine
@@ -2144,6 +2162,11 @@ func TestCUJ_G4_AgentCrashReturnsErrorAndRecovers(t *testing.T) {
 // reaches the user's screen.
 func TestCUJ_G5_ToolFailureSurfacesToUser(t *testing.T) {
 	env := newCUJEnv(t)
+	t.Cleanup(func() {
+		if err := env.engine.Stop(); err != nil {
+			t.Error(err)
+		}
+	})
 
 	// Establish a session.
 	env.userSends("g5", "hello")
@@ -2177,6 +2200,29 @@ func TestCUJ_G5_ToolFailureSurfacesToUser(t *testing.T) {
 	if !env.sentContains("permission denied") && !env.sentContains("bash tool exited") {
 		t.Fatalf("user did not see the underlying tool error in reply; got: %v", env.plat.getSent())
 	}
+
+	// A failed turn does not stop a persistent agent's background work.
+	// Deliver its result without asking the user to send "continue".
+	env.waitFor("failed foreground turn released", 2*time.Second, func() bool {
+		return !env.activeSession("test:g5").Busy()
+	})
+	sess.events <- Event{Type: EventText, Content: "background task finished"}
+	sess.events <- Event{Type: EventResult, Done: true}
+	env.waitFor("background result after failed turn", 2*time.Second, func() bool {
+		return env.sentContains("background task finished")
+	})
+	if got := len(sess.getSentPrompts()); got != 2 {
+		t.Fatalf("failed prompt was retried: sent %d prompts, want 2", got)
+	}
+
+	// A new user turn must take ownership from the background reader.
+	sess.mu.Lock()
+	sess.reply = "follow-up answer"
+	sess.mu.Unlock()
+	env.userSends("g5", "what happened next?")
+	env.waitFor("follow-up answer after failed turn", 2*time.Second, func() bool {
+		return env.sentContains("follow-up answer") && !env.activeSession("test:g5").Busy()
+	})
 }
 
 // CUJ-G6 · Network flap: undelivered outbound messages eventually arrive
@@ -2237,9 +2283,10 @@ func TestCUJ_G6_NetworkFlapLinkedToPlatformLayer(t *testing.T) {
 	})
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // SPRINT 2 · H organization (multi-platform/multi-project remaining)
-// ===========================================================================
+// ====================================================================}
 
 // CUJ-H1 · Two projects in one cc-connect: sessions/messages do not cross
 // project boundaries. Covered at integration level.
@@ -2253,9 +2300,10 @@ func TestCUJ_H3_SharedSessionLinkedToIntegration(t *testing.T) {
 	t.Log("CUJ-H3: covered by release-gate TestCC_SESSION_01_share_session")
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // SPRINT 2 · I organization (UI rendering correctness)
-// ===========================================================================
+// ====================================================================}
 
 // CUJ-I1 · Rich card mode produces valid card JSON for the platform.
 // Covered by platform/feishu/card_test.go and release-gate TestCC_CARD_01_rich.
@@ -2320,13 +2368,14 @@ func TestCUJ_I5_LocalReferencesPreserveReplyContent(t *testing.T) {
 	}
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // CUJ-H2 · Two platforms attached to the same engine handle concurrent
 // messages without bleeding state into each other.
 //
 // Smoke-tests the "two platforms in one engine" path that powers
 // multi-channel deployments (e.g. user reachable on both Slack and Discord).
-// ===========================================================================
+// ====================================================================}
 
 func TestCUJ_H2_TwoPlatformsConcurrentNoBleed(t *testing.T) {
 	dir := t.TempDir()
@@ -2550,7 +2599,8 @@ func (a *cujAgent) setNextSessionEvents(events []Event, delayMs int) {
 	a.nextSessionDelayMs = delayMs
 }
 
-// ===========================================================================
+// ====================================================================}
+
 // CUJ-STREAM-1 · After a permission prompt (AskUserQuestion or regular
 // permission request) the agent emits more text in the same turn. The user
 // MUST see that text streamed into a NEW card via the platform's
@@ -2571,7 +2621,7 @@ func (a *cujAgent) setNextSessionEvents(events []Event, delayMs int) {
 //
 // ≥3 user actions: (1) send prompt, (2) receive question card + tap an
 // option, (3) observe the agent's continuation stream.
-// ===========================================================================
+// ====================================================================}
 
 func TestCUJ_STREAM1_StreamingResumesAfterPermissionPrompt(t *testing.T) {
 	env := newCUJStreamingEnv(t)
@@ -4273,4 +4323,55 @@ func TestCUJ_C7_SteerMovesFinalAnswerToLatest(t *testing.T) {
 			await(e.i18n.T(MsgSharedDetached))
 		})
 	}
+}
+
+// Opening, changing, and reopening reasoning controls must stay in the
+// workspace selected by the platform session, including card callbacks.
+func TestCUJ_R1_ReasoningCardsPreserveWorkspaceIsolation(t *testing.T) {
+	p := &reasoningJourneyPlatform{stubCardPlatform: stubCardPlatform{stubPlatformEngine: stubPlatformEngine{n: "test"}}}
+	global := &workspaceEffortAgent{levels: []string{"global"}, effort: "global"}
+	e := NewEngine("test", global, []Platform{p}, "", LangEnglish)
+	e.SetMultiWorkspace(t.TempDir(), filepath.Join(t.TempDir(), "bindings.json"))
+	dir := normalizeWorkspacePath(t.TempDir())
+	e.workspaceBindings.Bind("project:test", "C-journey", "chan", dir)
+	ws := e.workspacePool.GetOrCreate(dir)
+	ws.agent = &workspaceEffortAgent{levels: []string{"off", "high"}}
+	ws.sessions = NewSessionManager("")
+	e.onPlatformReady(p)
+	key := "feishu:C-journey:u1"
+	send := func(content string) {
+		e.ReceiveMessage(p, &Message{SessionKey: key, Content: content, ReplyCtx: "ctx", UserID: "u1"})
+	}
+	assertCard := func(card *Card, want string) {
+		t.Helper()
+		got := fmt.Sprintf("%+v", card.Elements)
+		if !strings.Contains(got, want) || strings.Contains(got, "global") {
+			t.Fatalf("card = %s; want %s without global effort", got, want)
+		}
+	}
+	// Action 1: open the workspace's controls through the message entrypoint.
+	send("/reasoning")
+	if len(p.repliedCards) != 1 {
+		t.Fatalf("expected card, got %d", len(p.repliedCards))
+	}
+	assertCard(p.repliedCards[0], "off|high")
+	// Action 2: choose high through the platform's registered callback.
+	if p.navigation == nil {
+		t.Fatal("card callback not registered")
+	}
+	assertCard(p.navigation("act:/reasoning 2", key), e.i18n.Tf(MsgReasoningCurrent, "high"))
+	// Action 3: navigate back to the controls.
+	assertCard(p.navigation("nav:/reasoning", key), e.i18n.Tf(MsgReasoningCurrent, "high"))
+	// Action 4: reopen from a message; persisted selection remains visible.
+	send("/reasoning")
+	assertCard(p.repliedCards[len(p.repliedCards)-1], e.i18n.Tf(MsgReasoningCurrent, "high"))
+}
+
+type reasoningJourneyPlatform struct {
+	stubCardPlatform
+	navigation CardNavigationHandler
+}
+
+func (p *reasoningJourneyPlatform) SetCardNavigationHandler(h CardNavigationHandler) {
+	p.navigation = h
 }
