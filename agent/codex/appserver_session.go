@@ -1382,13 +1382,14 @@ func (s *appServerSession) handleItemCompleted(item map[string]any) {
 		}
 		success := appServerToolSuccess(status, exitCodePtr)
 		s.emit(core.Event{
-			Type:         core.EventToolResult,
-			ToolName:     "Bash",
-			ToolInput:    command,
-			ToolResult:   truncate(strings.TrimSpace(output), 500),
-			ToolStatus:   strings.TrimSpace(status),
-			ToolExitCode: exitCodePtr,
-			ToolSuccess:  &success,
+			Type:           core.EventToolResult,
+			ToolName:       "Bash",
+			ToolInput:      command,
+			ToolResult:     truncate(strings.TrimSpace(output), 500),
+			ToolResultTail: core.ToolOutputTail(output),
+			ToolStatus:     strings.TrimSpace(status),
+			ToolExitCode:   exitCodePtr,
+			ToolSuccess:    &success,
 		})
 
 	case "mcpToolCall":
@@ -1400,19 +1401,21 @@ func (s *appServerSession) handleItemCompleted(item map[string]any) {
 		}
 		success := appServerToolSuccess(status, nil)
 		s.emit(core.Event{
-			Type:        core.EventToolResult,
-			ToolName:    tool,
-			ToolResult:  truncate(strings.TrimSpace(result), 500),
-			ToolStatus:  strings.TrimSpace(status),
-			ToolSuccess: &success,
+			Type:           core.EventToolResult,
+			ToolName:       tool,
+			ToolResult:     truncate(strings.TrimSpace(result), 500),
+			ToolResultTail: core.ToolOutputTail(result),
+			ToolStatus:     strings.TrimSpace(status),
+			ToolSuccess:    &success,
 		})
 
 	case "webSearch":
 		query, _ := item["query"].(string)
 		s.emit(core.Event{
-			Type:       core.EventToolResult,
-			ToolName:   "WebSearch",
-			ToolResult: truncate(strings.TrimSpace(query), 500),
+			Type:           core.EventToolResult,
+			ToolName:       "WebSearch",
+			ToolResult:     truncate(strings.TrimSpace(query), 500),
+			ToolResultTail: core.ToolOutputTail(query),
 		})
 
 	case "dynamicToolCall":
@@ -1421,11 +1424,12 @@ func (s *appServerSession) handleItemCompleted(item map[string]any) {
 		result := appServerDynamicToolText(item["contentItems"])
 		success := appServerToolSuccess(status, nil)
 		s.emit(core.Event{
-			Type:        core.EventToolResult,
-			ToolName:    tool,
-			ToolResult:  truncate(strings.TrimSpace(result), 500),
-			ToolStatus:  strings.TrimSpace(status),
-			ToolSuccess: &success,
+			Type:           core.EventToolResult,
+			ToolName:       tool,
+			ToolResult:     truncate(strings.TrimSpace(result), 500),
+			ToolResultTail: core.ToolOutputTail(result),
+			ToolStatus:     strings.TrimSpace(status),
+			ToolSuccess:    &success,
 		})
 	}
 }
