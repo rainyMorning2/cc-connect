@@ -1,5 +1,7 @@
 # Usage Guide
 
+[English](usage.md) | [中文](usage.zh-CN.md) | [Русский](usage.ru.md)
+
 Complete guide to using cc-connect features.
 
 For Codex managed daemon and Kimi Web, the unattached model and reasoning menus include

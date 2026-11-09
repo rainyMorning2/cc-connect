@@ -36,7 +36,8 @@ import (
 	larkws "github.com/larksuite/oapi-sdk-go/v3/ws"
 )
 
-// sanitizingLogger wraps a logger and masks sensitive URL parameters.
+// sanitizingLogger masks sensitive URL parameters and respects the application log level.
+// The WebSocket SDK does not apply WithLogLevel to a custom logger.
 type sanitizingLogger struct {
 	inner larkcore.Logger
 }
@@ -72,7 +73,11 @@ func (l *sanitizingLogger) sanitize(s string) string {
 	return s
 }
 
+// Debug forwards sanitized SDK messages only when the application enables this level.
 func (l *sanitizingLogger) Debug(ctx context.Context, args ...interface{}) {
+	if !slog.Default().Enabled(ctx, slog.LevelDebug) {
+		return
+	}
 	for _, arg := range args {
 		s, ok := arg.(string)
 		if !ok {
@@ -86,15 +91,27 @@ func (l *sanitizingLogger) Debug(ctx context.Context, args ...interface{}) {
 	l.inner.Debug(ctx, l.maskURL(args...)...)
 }
 
+// Info forwards sanitized SDK messages only when the application enables this level.
 func (l *sanitizingLogger) Info(ctx context.Context, args ...interface{}) {
+	if !slog.Default().Enabled(ctx, slog.LevelInfo) {
+		return
+	}
 	l.inner.Info(ctx, l.maskURL(args...)...)
 }
 
+// Warn forwards sanitized SDK messages only when the application enables this level.
 func (l *sanitizingLogger) Warn(ctx context.Context, args ...interface{}) {
+	if !slog.Default().Enabled(ctx, slog.LevelWarn) {
+		return
+	}
 	l.inner.Warn(ctx, l.maskURL(args...)...)
 }
 
+// Error forwards sanitized SDK messages only when the application enables this level.
 func (l *sanitizingLogger) Error(ctx context.Context, args ...interface{}) {
+	if !slog.Default().Enabled(ctx, slog.LevelError) {
+		return
+	}
 	l.inner.Error(ctx, l.maskURL(args...)...)
 }
 
@@ -752,7 +769,7 @@ func (p *Platform) startWebSocketMode() error {
 	p.mu.Unlock()
 
 	go func() {
-		if err := p.wsClient.Start(ctx); err != nil {
+		if err := p.wsClient.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			slog.Error(p.tag()+": websocket error", "error", err)
 		}
 	}()
@@ -955,12 +972,10 @@ func (p *Platform) onCardAction(event *callback.CardActionTriggerEvent) (*callba
 		}
 
 		rctx := replyContext{messageID: messageID, chatID: chatID, sessionKey: sessionKey}
-		go p.dispatchCoreMessage(&core.Message{
+		p.dispatchCardActionMessage(chatID, &core.Message{
 			SessionKey:           sessionKey,
 			Platform:             p.platformName,
 			UserID:               userID,
-			UserName:             p.resolveUserName(userID),
-			ChatName:             p.resolveChatName(chatID),
 			Content:              responseText,
 			ReplyCtx:             rctx,
 			IsPermissionResponse: true,
@@ -987,12 +1002,10 @@ func (p *Platform) onCardAction(event *callback.CardActionTriggerEvent) (*callba
 	// askq: — AskUserQuestion option selected, forward as user message
 	if strings.HasPrefix(actionVal, "askq:") {
 		rctx := replyContext{messageID: messageID, chatID: chatID, sessionKey: sessionKey}
-		go p.dispatchCoreMessage(&core.Message{
+		p.dispatchCardActionMessage(chatID, &core.Message{
 			SessionKey: sessionKey,
 			Platform:   p.platformName,
 			UserID:     userID,
-			UserName:   p.resolveUserName(userID),
-			ChatName:   p.resolveChatName(chatID),
 			Content:    actionVal,
 			ReplyCtx:   rctx,
 		})
@@ -1026,8 +1039,6 @@ func (p *Platform) onCardAction(event *callback.CardActionTriggerEvent) (*callba
 			SessionKey: sessionKey,
 			Platform:   p.platformName,
 			UserID:     userID,
-			UserName:   p.resolveUserName(userID),
-			ChatName:   p.resolveChatName(chatID),
 			Content:    cmdText,
 			ReplyCtx:   rctx,
 		}
@@ -1037,7 +1048,7 @@ func (p *Platform) onCardAction(event *callback.CardActionTriggerEvent) (*callba
 		if strings.HasPrefix(cmdText, "/decision ") || strings.HasPrefix(cmdText, "/async-answer ") {
 			result := make(chan *core.Card, 1)
 			msg.CardActionResult = func(card *core.Card) { result <- card }
-			go p.dispatchCoreMessage(msg)
+			p.dispatchCardActionMessage(chatID, msg)
 			select {
 			case card := <-result:
 				return &callback.CardActionTriggerResponse{Card: &callback.Card{Type: "raw", Data: renderCardMap(card, sessionKey)}}, nil
@@ -1062,7 +1073,7 @@ func (p *Platform) onCardAction(event *callback.CardActionTriggerEvent) (*callba
 				return &callback.CardActionTriggerResponse{Toast: &callback.Toast{Type: "info", Content: p.actionProcessingText()}}, nil
 			}
 		}
-		go p.dispatchCoreMessage(msg)
+		p.dispatchCardActionMessage(chatID, msg)
 
 		if ac, ok := event.Event.Action.Value["after_click"].(map[string]any); ok {
 			if title, _ := ac["title"].(string); title != "" {
@@ -1249,7 +1260,7 @@ func (p *Platform) IsMessageRecalled(ctx context.Context, rctx any) (bool, error
 
 	req := larkim.NewGetMessageReqBuilder().
 		MessageId(messageID).
-		UserIdType(larkim.UserIdTypeGetMessageOpenId).
+		UserIdType(larkim.UserIdTypeOpenId).
 		Build()
 
 	var resp *larkim.GetMessageResp
@@ -1295,6 +1306,22 @@ func isMessageWithdrawnError(err error) bool {
 		return false
 	}
 	return isMessageWithdrawnCode(0, err.Error())
+}
+
+// dispatchCardActionMessage forwards a card button action to the engine. The
+// name lookups are network calls, so they run inside the goroutine: as
+// arguments of a go statement they would be evaluated synchronously and hold
+// the card callback past Feishu's response window.
+//
+// Like the message path (dispatchMessageWithHistory), the goroutine has no
+// recover. The callback has already been answered when it runs, so Feishu will
+// not redeliver the action.
+func (p *Platform) dispatchCardActionMessage(chatID string, msg *core.Message) {
+	go func() {
+		msg.UserName = p.resolveUserName(msg.UserID)
+		msg.ChatName = p.resolveChatName(chatID)
+		p.dispatchCoreMessage(msg)
+	}()
 }
 
 func (p *Platform) dispatchCoreMessage(msg *core.Message) {
@@ -2361,6 +2388,11 @@ func (p *Platform) dispatchMessageWithHistory(ctx context.Context, msgType, cont
 	}
 }
 
+// nameLookupTimeout bounds the display-name lookups that run before an inbound
+// message reaches the engine. The SDK client has no request timeout, so without
+// it a request on a dead keep-alive connection blocks the message forever.
+var nameLookupTimeout = 5 * time.Second
+
 // resolveUserName fetches a user's display name via the Contact API, with caching.
 func (p *Platform) resolveUserName(openID string) string {
 	if !isValidFeishuLookupID(openID) {
@@ -2369,13 +2401,15 @@ func (p *Platform) resolveUserName(openID string) string {
 	if cached, ok := p.userNameCache.Load(openID); ok {
 		return cached.(string)
 	}
-	resp, err := p.client.Contact.User.Get(context.Background(),
+	ctx, cancel := context.WithTimeout(context.Background(), nameLookupTimeout)
+	defer cancel()
+	resp, err := p.client.Contact.User.Get(ctx,
 		larkcontact.NewGetUserReqBuilder().
 			UserId(openID).
 			UserIdType("open_id").
 			Build())
 	if err != nil {
-		slog.Debug(p.tag()+": resolve user name failed", "open_id", openID, "error", err)
+		slog.Warn(p.tag()+": resolve user name failed", "open_id", openID, "error", err)
 		return openID
 	}
 	if !resp.Success() || resp.Data == nil || resp.Data.User == nil || resp.Data.User.Name == nil {
@@ -2439,19 +2473,23 @@ func (p *Platform) resolveChatName(chatID string) string {
 	if cached, ok := p.chatNameCache.Load(chatID); ok {
 		return cached.(string)
 	}
-	resp, err := p.client.Im.Chat.Get(context.Background(),
+	ctx, cancel := context.WithTimeout(context.Background(), nameLookupTimeout)
+	defer cancel()
+	resp, err := p.client.Im.Chat.Get(ctx,
 		larkim.NewGetChatReqBuilder().ChatId(chatID).Build())
 	if err != nil {
-		slog.Debug(p.tag()+": resolve chat name failed", "chat_id", chatID, "error", err)
+		slog.Warn(p.tag()+": resolve chat name failed", "chat_id", chatID, "error", err)
 		return chatID
 	}
-	if !resp.Success() || resp.Data == nil || resp.Data.Name == nil {
+	if !resp.Success() || resp.Data == nil {
 		slog.Debug(p.tag()+": resolve chat name: no data", "chat_id", chatID, "code", resp.Code)
 		return chatID
 	}
-	name := *resp.Data.Name
-	if name == "" {
-		return chatID
+	// p2p chats have no name. That answer is final, so cache the fallback too;
+	// otherwise every DM repeats this request before it can be dispatched.
+	name := chatID
+	if resp.Data.Name != nil && *resp.Data.Name != "" {
+		name = *resp.Data.Name
 	}
 	p.chatNameCache.Store(chatID, name)
 	return name
@@ -3633,13 +3671,13 @@ func detectFeishuFileType(mimeType, fileName string) string {
 	name := strings.ToLower(fileName)
 	switch {
 	case mimeType == "application/pdf" || strings.HasSuffix(name, ".pdf"):
-		return larkim.FileTypePdf
+		return larkim.CreateFileFileTypePdf
 	case strings.HasSuffix(name, ".doc") || strings.HasSuffix(name, ".docx"):
-		return larkim.FileTypeDoc
+		return larkim.CreateFileFileTypeDoc
 	case strings.HasSuffix(name, ".xls") || strings.HasSuffix(name, ".xlsx") || strings.HasSuffix(name, ".csv"):
-		return larkim.FileTypeXls
+		return larkim.CreateFileFileTypeXls
 	case strings.HasSuffix(name, ".ppt") || strings.HasSuffix(name, ".pptx"):
-		return larkim.FileTypePpt
+		return larkim.CreateFileFileTypePpt
 	// Feishu's file API only has "mp4" as the video type. We map all common
 	// video MIME types and extensions to FileTypeMp4 so the message renders
 	// as a native video player bubble rather than a generic file download.
@@ -3649,19 +3687,19 @@ func detectFeishuFileType(mimeType, fileName string) string {
 		strings.HasSuffix(name, ".mp4") || strings.HasSuffix(name, ".mov") ||
 		strings.HasSuffix(name, ".avi") || strings.HasSuffix(name, ".m4v") ||
 		strings.HasSuffix(name, ".mkv") || strings.HasSuffix(name, ".webm"):
-		return larkim.FileTypeMp4
+		return larkim.CreateFileFileTypeMp4
 	case mimeType == "audio/ogg" || mimeType == "audio/opus" || mimeType == "application/ogg" || strings.HasSuffix(name, ".ogg") || strings.HasSuffix(name, ".opus"):
-		return larkim.FileTypeOpus
+		return larkim.CreateFileFileTypeOpus
 	default:
-		return larkim.FileTypeStream
+		return larkim.CreateFileFileTypeStream
 	}
 }
 
 func detectFeishuFileMessageType(fileType string) string {
 	switch fileType {
-	case larkim.FileTypeOpus:
+	case larkim.CreateFileFileTypeOpus:
 		return larkim.MsgTypeAudio
-	case larkim.FileTypeMp4:
+	case larkim.CreateFileFileTypeMp4:
 		return larkim.MsgTypeMedia
 	default:
 		return larkim.MsgTypeFile
@@ -4346,7 +4384,7 @@ func (p *Platform) createMessage(ctx context.Context, chatID, msgType, content, 
 
 func (p *Platform) createMessageWithID(ctx context.Context, chatID, msgType, content, op string) (string, error) {
 	req := larkim.NewCreateMessageReqBuilder().
-		ReceiveIdType(larkim.ReceiveIdTypeChatId).
+		ReceiveIdType(larkim.CreateMessageV1ReceiveIDTypeChatId).
 		Body(larkim.NewCreateMessageReqBodyBuilder().
 			ReceiveId(chatID).
 			MsgType(msgType).
@@ -5235,10 +5273,13 @@ func progressPanelTitle(label string, count int, lang string) string {
 	return label
 }
 
-func buildProgressPanel(title string, expanded bool, elements []map[string]any) map[string]any {
+// Panels always start collapsed. Every card update re-sends the whole card, so
+// an expanded flag would re-open the panels on each refresh and make the text
+// below them jump while the turn is running.
+func buildProgressPanel(title string, elements []map[string]any) map[string]any {
 	return map[string]any{
 		"tag":              "collapsible_panel",
-		"expanded":         expanded,
+		"expanded":         false,
 		"background_color": "grey",
 		"header": map[string]any{
 			"title": map[string]any{"tag": "plain_text", "content": title},
@@ -5258,26 +5299,23 @@ func buildProgressPanelElements(items []core.ProgressCardEntry, lang string) []m
 	return elements
 }
 
-func appendProgressGroupedElements(elements []map[string]any, items []core.ProgressCardEntry, lang string, running bool) []map[string]any {
+func appendProgressGroupedElements(elements []map[string]any, items []core.ProgressCardEntry, lang string) []map[string]any {
 	reasoning, tools, others := splitProgressItemsByLane(items)
 	if len(reasoning) > 0 {
 		elements = append(elements, buildProgressPanel(
 			progressPanelTitle("Reasoning", len(reasoning), lang),
-			running,
 			buildProgressPanelElements(reasoning, lang),
 		))
 	}
 	if len(tools) > 0 {
 		elements = append(elements, buildProgressPanel(
 			progressPanelTitle("Tools", len(tools), lang),
-			running,
 			buildProgressPanelElements(tools, lang),
 		))
 	}
 	if len(others) > 0 {
 		elements = append(elements, buildProgressPanel(
 			progressPanelTitle("Updates", len(others), lang),
-			running,
 			buildProgressPanelElements(others, lang),
 		))
 	}
@@ -5292,7 +5330,6 @@ func buildProgressCardJSONFromPayload(payload *core.ProgressCardPayload) string 
 
 	agent := progressAgentLabel(payload.Agent)
 	title, template, footer := progressStateMeta(payload.State, payload.Lang, agent)
-	running := payload.State == core.ProgressCardStateRunning
 
 	elements := make([]map[string]any, 0, len(items)+3)
 	if payload.Truncated {
@@ -5312,7 +5349,7 @@ func buildProgressCardJSONFromPayload(payload *core.ProgressCardPayload) string 
 		elements = append(elements, map[string]any{"tag": "hr"})
 	}
 
-	elements = appendProgressGroupedElements(elements, items, payload.Lang, running)
+	elements = appendProgressGroupedElements(elements, items, payload.Lang)
 	if footer != "" {
 		elements = append(elements, map[string]any{"tag": "hr"})
 		elements = append(elements, map[string]any{
@@ -5435,7 +5472,7 @@ func (p *Platform) SendPreviewStart(ctx context.Context, rctx any, content strin
 		}
 	} else {
 		req := larkim.NewCreateMessageReqBuilder().
-			ReceiveIdType(larkim.ReceiveIdTypeChatId).
+			ReceiveIdType(larkim.CreateMessageV1ReceiveIDTypeChatId).
 			Body(larkim.NewCreateMessageReqBodyBuilder().
 				ReceiveId(chatID).
 				MsgType(larkim.MsgTypeInteractive).
@@ -5799,7 +5836,7 @@ func (p *Platform) SendAudio(ctx context.Context, rctx any, audio []byte, format
 		return p.withFreshTenantAccessTokenRetry(ctx, "upload audio", func(client *lark.Client, options ...larkcore.RequestOptionFunc) error {
 			req := larkim.NewCreateFileReqBuilder().
 				Body(larkim.NewCreateFileReqBodyBuilder().
-					FileType(larkim.FileTypeOpus).
+					FileType(larkim.CreateFileFileTypeOpus).
 					FileName("tts_audio.opus").
 					File(bytes.NewReader(audio)).
 					Build()).
@@ -5874,7 +5911,7 @@ func (p *Platform) SendVideo(ctx context.Context, rctx any, video []byte, format
 		return p.withFreshTenantAccessTokenRetry(ctx, "upload video", func(client *lark.Client, options ...larkcore.RequestOptionFunc) error {
 			req := larkim.NewCreateFileReqBuilder().
 				Body(larkim.NewCreateFileReqBodyBuilder().
-					FileType(larkim.FileTypeMp4).
+					FileType(larkim.CreateFileFileTypeMp4).
 					FileName(fileName).
 					File(bytes.NewReader(video)).
 					Build()).
@@ -7460,10 +7497,11 @@ func richPanelElements(steps []core.ToolStep, emptyText string) []map[string]any
 	return elements
 }
 
-func buildRichPanel(title string, expanded bool, elements []map[string]any) map[string]any {
+// buildRichPanel panels start collapsed for the same reason as buildProgressPanel.
+func buildRichPanel(title string, elements []map[string]any) map[string]any {
 	return map[string]any{
 		"tag":              "collapsible_panel",
-		"expanded":         expanded,
+		"expanded":         false,
 		"background_color": "grey",
 		"header": map[string]any{
 			"title": map[string]any{"tag": "plain_text", "content": title},
@@ -7533,14 +7571,12 @@ func buildRichCardJSONBytes(status core.CardStatus, steps []core.ToolStep, markd
 	if len(reasoningSteps) > 0 {
 		activityElements = append(activityElements, buildRichPanel(
 			richLaneTitle("Reasoning", len(reasoningSteps)),
-			streaming,
 			richPanelElements(reasoningSteps, "Thinking..."),
 		))
 	}
 	if len(toolSteps) > 0 {
 		activityElements = append(activityElements, buildRichPanel(
 			richLaneTitle("Tools", len(toolSteps)),
-			false,
 			richPanelElements(toolSteps, "No tool steps"),
 		))
 		activityElements = append(activityElements, richToolPreviewElement(toolSteps[len(toolSteps)-1]))
@@ -7550,15 +7586,17 @@ func buildRichCardJSONBytes(status core.CardStatus, steps []core.ToolStep, markd
 			continue
 		}
 		expanded := step.Status == "failed" || step.Status == "suspended"
-		activityElements = append(activityElements, buildRichPanel(step.Name, expanded, []map[string]any{
+		panel := buildRichPanel(step.Name, []map[string]any{
 			{"tag": "div", "text": map[string]any{"tag": "plain_text", "content": step.Summary}},
-		}))
+		})
+		panel["expanded"] = expanded
+		activityElements = append(activityElements, panel)
 		if step.ResultTail != "" {
 			activityElements = append(activityElements, map[string]any{"tag": "div", "text": map[string]any{"tag": "plain_text", "content": step.ResultTail, "text_size": "notation"}})
 		}
 	}
 	if len(activityElements) == 0 && streaming {
-		activityElements = append(activityElements, buildRichPanel("Reasoning", true, richPanelElements(nil, "Thinking...")))
+		activityElements = append(activityElements, buildRichPanel("Reasoning", richPanelElements(nil, "Thinking...")))
 	}
 
 	markdownMap := map[string]any{
