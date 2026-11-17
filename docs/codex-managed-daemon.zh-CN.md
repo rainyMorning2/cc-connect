@@ -45,7 +45,7 @@ daemon_enable_delete = true
 | `daemon_enable_async_questions` | `true` | 是否接收可通过 steer 回答的异步提示。 |
 | `daemon_enable_delete` | `true` | 是否允许 `/delete` 通过 daemon 删除 thread。 |
 
-托管模式不接受 `env` 和 `app_server_url`；凭据、Provider 和进程环境需要在 daemon 中配置。接入已有 thread 时，该 thread 自身的 model、Provider、审批策略和 sandbox 设置会保留；`model`、`mode`、`reasoning_effort`、`provider` 只用于新建 thread。
+托管模式不接受 `env`、`app_server_url` 和 `permission_profile`；凭据、Provider、进程环境和命名权限配置需要在 daemon 中配置。接入已有 thread 时，该 thread 自身的 model、Provider、审批策略和 sandbox 设置会保留；`model`、`mode`、`reasoning_effort`、`provider` 只用于新建 thread。
 
 已接入后，`/model` 和 `/effort`（或 `/reasoning`）命令直接查看、修改当前 thread 的模型和推理强度；
 未接入时设置新建 thread 的默认值。模型目录和对应的 effort 选项在接入前后都从 daemon 的 `model/list` 获取，支持分页和服务端定义的强度名称。

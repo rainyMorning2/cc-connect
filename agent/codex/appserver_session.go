@@ -39,22 +39,31 @@ type initResponse struct {
 	ProtocolVersion string `json:"protocolVersion"`
 }
 
+// appServerActivePermissionProfile identifies the permissions selected by Codex.
+type appServerActivePermissionProfile struct {
+	ID string `json:"id"`
+}
+
+// threadStartResponse carries the new thread metadata and permission provenance.
 type threadStartResponse struct {
-	Cwd             string  `json:"cwd"`
-	Model           string  `json:"model"`
-	ReasoningEffort *string `json:"reasoningEffort"`
-	ServiceTier     *string `json:"serviceTier"`
-	Thread          struct {
+	ActivePermissionProfile *appServerActivePermissionProfile `json:"activePermissionProfile"`
+	Cwd                     string                            `json:"cwd"`
+	Model                   string                            `json:"model"`
+	ReasoningEffort         *string                           `json:"reasoningEffort"`
+	ServiceTier             *string                           `json:"serviceTier"`
+	Thread                  struct {
 		ID string `json:"id"`
 	} `json:"thread"`
 }
 
+// threadResumeResponse carries the resumed thread metadata and permission provenance.
 type threadResumeResponse struct {
-	Cwd             string  `json:"cwd"`
-	Model           string  `json:"model"`
-	ReasoningEffort *string `json:"reasoningEffort"`
-	ServiceTier     *string `json:"serviceTier"`
-	Thread          struct {
+	ActivePermissionProfile *appServerActivePermissionProfile `json:"activePermissionProfile"`
+	Cwd                     string                            `json:"cwd"`
+	Model                   string                            `json:"model"`
+	ReasoningEffort         *string                           `json:"reasoningEffort"`
+	ServiceTier             *string                           `json:"serviceTier"`
+	Thread                  struct {
 		ID string `json:"id"`
 	} `json:"thread"`
 }
@@ -63,6 +72,10 @@ type turnStartResponse struct {
 	Turn struct {
 		ID string `json:"id"`
 	} `json:"turn"`
+}
+
+type turnSteerResponse struct {
+	TurnID string `json:"turnId"`
 }
 
 type turnNotification struct {
@@ -150,21 +163,23 @@ type appServerRequestUserInputAnswer struct {
 	Answers []string `json:"answers"`
 }
 
+// appServerSession owns the stdio JSON-RPC transport and the active thread state.
 type appServerSession struct {
-	opMu           sync.Mutex // serializes sends and explicit runtime setting changes
-	cliBin         string
-	cliExtraArgs   []string
-	url            string
-	workDir        string
-	model          string
-	effort         string
-	serviceTier    string
-	mode           string
-	baseURL        string
-	modelProvider  string
-	extraEnv       []string
-	codexHome      string
-	promptPreamble string
+	permissionProfile string
+	opMu              sync.Mutex // serializes sends and explicit runtime setting changes
+	cliBin            string
+	cliExtraArgs      []string
+	url               string
+	workDir           string
+	model             string
+	effort            string
+	serviceTier       string
+	mode              string
+	baseURL           string
+	modelProvider     string
+	extraEnv          []string
+	codexHome         string
+	promptPreamble    string
 
 	events       chan core.Event
 	eventsMu     sync.RWMutex // publishers share the lock; Close owns channel closure
@@ -209,27 +224,29 @@ const (
 	appServerUsageRefreshTimeout = 1500 * time.Millisecond
 )
 
-func newAppServerSession(ctx context.Context, cliBin string, cliExtraArgs []string, url, workDir, model, effort, mode, resumeID, baseURL, modelProvider string, extraEnv []string, codexHome string, systemPrompt string, appendPrompt string, serviceTier string) (*appServerSession, error) {
+// newAppServerSession connects to Codex and verifies the requested permissions before returning a usable session.
+func newAppServerSession(ctx context.Context, cliBin string, cliExtraArgs []string, url, workDir, model, effort, mode, resumeID, baseURL, modelProvider string, extraEnv []string, codexHome string, systemPrompt string, appendPrompt string, permissionProfile string, serviceTier string) (*appServerSession, error) {
 	sessionCtx, cancel := context.WithCancel(ctx)
 	s := &appServerSession{
-		cliBin:           cliBin,
-		cliExtraArgs:     append([]string(nil), cliExtraArgs...),
-		url:              url,
-		workDir:          workDir,
-		model:            model,
-		effort:           effort,
-		mode:             mode,
-		baseURL:          baseURL,
-		modelProvider:    modelProvider,
-		extraEnv:         append([]string(nil), extraEnv...),
-		codexHome:        strings.TrimSpace(codexHome),
-		promptPreamble:   buildCodexPromptPreamble(systemPrompt, appendPrompt),
-		events:           make(chan core.Event, 128),
-		ctx:              sessionCtx,
-		cancel:           cancel,
-		pending:          make(map[int64]chan rpcResponseEnvelope),
-		pendingApprovals: make(map[string]chan core.PermissionResult),
-		preambleSent:     resumeID != "" && resumeID != core.ContinueSession,
+		cliBin:            cliBin,
+		cliExtraArgs:      append([]string(nil), cliExtraArgs...),
+		url:               url,
+		workDir:           workDir,
+		model:             model,
+		effort:            effort,
+		mode:              mode,
+		permissionProfile: permissionProfile,
+		baseURL:           baseURL,
+		modelProvider:     modelProvider,
+		extraEnv:          append([]string(nil), extraEnv...),
+		codexHome:         strings.TrimSpace(codexHome),
+		promptPreamble:    buildCodexPromptPreamble(systemPrompt, appendPrompt),
+		events:            make(chan core.Event, 128),
+		ctx:               sessionCtx,
+		cancel:            cancel,
+		pending:           make(map[int64]chan rpcResponseEnvelope),
+		pendingApprovals:  make(map[string]chan core.PermissionResult),
+		preambleSent:      resumeID != "" && resumeID != core.ContinueSession,
 	}
 	s.serviceTier = serviceTier
 	s.alive.Store(true)
@@ -369,6 +386,7 @@ func (s *appServerSession) initialize() error {
 	return nil
 }
 
+// ensureThread starts or resumes a thread and checks that its configured permission profile took effect.
 func (s *appServerSession) ensureThread(resumeID string) error {
 	if resumeID != "" && resumeID != core.ContinueSession {
 		params := s.threadRequestParams()
@@ -380,6 +398,9 @@ func (s *appServerSession) ensureThread(resumeID string) error {
 		}
 		if resp.Thread.ID == "" {
 			return fmt.Errorf("codex app-server resume returned empty thread id")
+		}
+		if err := s.validatePermissionProfile(resp.ActivePermissionProfile); err != nil {
+			return err
 		}
 		s.applyThreadRuntimeState(resp.Cwd, resp.Model, resp.ReasoningEffort)
 		s.storeServiceTier(stringValue(resp.ServiceTier))
@@ -395,6 +416,9 @@ func (s *appServerSession) ensureThread(resumeID string) error {
 	if resp.Thread.ID == "" {
 		return fmt.Errorf("codex app-server start returned empty thread id")
 	}
+	if err := s.validatePermissionProfile(resp.ActivePermissionProfile); err != nil {
+		return err
+	}
 	s.applyThreadRuntimeState(resp.Cwd, resp.Model, resp.ReasoningEffort)
 	s.storeServiceTier(stringValue(resp.ServiceTier))
 	s.threadID.Store(resp.Thread.ID)
@@ -402,6 +426,21 @@ func (s *appServerSession) ensureThread(resumeID string) error {
 	return nil
 }
 
+// validatePermissionProfile rejects ignored or replaced profiles, including older servers that do not support the field.
+func (s *appServerSession) validatePermissionProfile(active *appServerActivePermissionProfile) error {
+	if s.permissionProfile == "" {
+		return nil
+	}
+	if active == nil {
+		return fmt.Errorf("codex app-server: permission profile %q was not confirmed; use a Codex version supporting named permission profiles", s.permissionProfile)
+	}
+	if active.ID != s.permissionProfile {
+		return fmt.Errorf("codex app-server: requested permission profile %q, received %q", s.permissionProfile, active.ID)
+	}
+	return nil
+}
+
+// threadRequestParams selects either named permissions or a legacy sandbox, never both.
 func (s *appServerSession) threadRequestParams() map[string]any {
 	params := map[string]any{
 		"experimentalRawEvents":  false,
@@ -415,7 +454,9 @@ func (s *appServerSession) threadRequestParams() map[string]any {
 	}
 	if approval, sandbox := appServerModeSettings(s.mode); approval != "" {
 		params["approvalPolicy"] = approval
-		if sandbox != "" {
+		if s.permissionProfile != "" {
+			params["permissions"] = s.permissionProfile
+		} else if sandbox != "" {
 			params["sandbox"] = sandbox
 		}
 	}
@@ -512,7 +553,8 @@ func (s *appServerSession) Send(prompt string, messageID string, images []core.I
 
 	s.stateMu.Lock()
 	turnRevision := s.turnRevision
-	if !s.preambleSent {
+	activeTurn := s.currentTurn
+	if activeTurn == "" && !s.preambleSent {
 		prompt = prependCodexPromptPreamble(prompt, s.promptPreamble)
 		s.preambleSent = true
 	}
@@ -536,6 +578,13 @@ func (s *appServerSession) Send(prompt string, messageID string, images []core.I
 		})
 	}
 
+	if activeTurn != "" {
+		return s.steerTurn(threadID, activeTurn, input)
+	}
+	return s.startTurn(threadID, input, turnRevision)
+}
+
+func (s *appServerSession) startTurn(threadID string, input []map[string]any, turnRevision uint64) error {
 	params := map[string]any{
 		"threadId": threadID,
 		"input":    input,
@@ -575,6 +624,35 @@ func (s *appServerSession) Send(prompt string, messageID string, images []core.I
 	s.pendingMsgs = s.pendingMsgs[:0]
 	s.stateMu.Unlock()
 
+	return nil
+}
+
+func (s *appServerSession) steerTurn(threadID, expectedTurnID string, input []map[string]any) error {
+	params := map[string]any{
+		"threadId":       threadID,
+		"expectedTurnId": expectedTurnID,
+		"input":          input,
+	}
+
+	var resp turnSteerResponse
+	if err := s.request("turn/steer", params, &resp); err != nil {
+		s.stateMu.Lock()
+		if s.currentTurn == expectedTurnID {
+			// A turn can finish before its delayed turn/start response is
+			// installed. Do not strand every later message on a stale ID;
+			// the next user message gets a normal turn/start instead.
+			s.currentTurn = ""
+			s.turnRevision++
+		}
+		s.stateMu.Unlock()
+		return fmt.Errorf("codex app-server turn/steer: %w", err)
+	}
+	if resp.TurnID == "" {
+		return fmt.Errorf("codex app-server turn/steer returned empty turn id")
+	}
+	if resp.TurnID != expectedTurnID {
+		return fmt.Errorf("codex app-server turn/steer returned turn id %q, want %q", resp.TurnID, expectedTurnID)
+	}
 	return nil
 }
 

@@ -44,7 +44,7 @@ daemon_enable_delete = true
 | `daemon_enable_async_questions` | `true` | Receive advisory questions answered through steer. |
 | `daemon_enable_delete` | `true` | Allow `/delete` to delete threads through the daemon. |
 
-Managed mode rejects `env` and `app_server_url`. Configure credentials, providers and process environment in the daemon. Attached threads retain their own model, provider, approval and sandbox settings; `model`, `mode`, `reasoning_effort` and `provider` configure new threads only.
+Managed mode rejects `env`, `app_server_url` and `permission_profile`. Configure credentials, providers, process environment and named permission profiles in the daemon. Attached threads retain their own model, provider, approval and sandbox settings; `model`, `mode`, `reasoning_effort` and `provider` configure new threads only.
 
 When attached, `/model` and `/effort` (or `/reasoning`) read and change the current thread's model and reasoning effort.
 Without an attached runtime, they select defaults for new threads. Models and model-specific effort options come from the daemon's `model/list`.
